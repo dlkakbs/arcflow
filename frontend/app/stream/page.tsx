@@ -41,7 +41,10 @@ const ABI = [
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <label className="block text-xs font-mono mb-2" style={{ color: "var(--muted)" }}>
+    <label
+      className="block mono mb-2"
+      style={{ color: "var(--muted)", fontSize: "10px", letterSpacing: "0.1em" }}
+    >
       {children}
     </label>
   );
@@ -51,9 +54,29 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className="w-full bg-transparent text-sm font-mono px-3 py-2.5 rounded outline-none focus:border-[#0066FF] transition-colors"
-      style={{ border: "1px solid var(--border)", color: "var(--text)" }}
+      className="w-full mono"
+      style={{
+        background: "transparent",
+        border: "1px solid var(--border)",
+        color: "var(--text)",
+        fontSize: "13px",
+        padding: "10px 12px",
+        outline: "none",
+        borderRadius: "2px",
+        transition: "border-color 0.15s",
+        fontFamily: "'IBM Plex Mono', monospace",
+      }}
+      onFocus={e => (e.target.style.borderColor = "var(--accent)")}
+      onBlur={e => (e.target.style.borderColor = "var(--border)")}
     />
+  );
+}
+
+function Hint({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="mono mt-1.5" style={{ color: "var(--muted)", fontSize: "10px", letterSpacing: "0.03em" }}>
+      {children}
+    </p>
   );
 }
 
@@ -92,13 +115,17 @@ export default function StreamPage() {
 
       {/* Header */}
       <div className="mb-12">
-        <p className="text-xs font-mono mb-3" style={{ color: "var(--blue)" }}>
-          STREAM
-        </p>
-        <h1 className="text-4xl font-semibold" style={{ letterSpacing: "-0.03em" }}>
+        <div className="flex items-center gap-3 mb-6">
+          <span className="tag">Stream</span>
+          <span className="mono" style={{ fontSize: "10px", color: "var(--muted)" }}>01 / 03</span>
+        </div>
+        <h1
+          className="mono mb-3"
+          style={{ fontSize: "36px", fontWeight: 300, letterSpacing: "-0.03em", lineHeight: 1.1 }}
+        >
           Continuous payments.
         </h1>
-        <p className="mt-3 text-sm" style={{ color: "var(--muted)" }}>
+        <p style={{ color: "var(--text-dim)", fontSize: "14px", lineHeight: 1.7 }}>
           USDC flows every second. Recipients withdraw whenever they want.
         </p>
       </div>
@@ -106,10 +133,17 @@ export default function StreamPage() {
       <div className="grid grid-cols-2 gap-8">
 
         {/* Create stream */}
-        <div className="p-6 rounded" style={{ border: "1px solid var(--border)" }}>
-          <p className="text-sm font-medium mb-6">New Stream</p>
+        <div style={{ border: "1px solid var(--border)", borderRadius: "3px", padding: "24px" }}>
+          <div className="flex items-center justify-between mb-6">
+            <p className="mono" style={{ fontSize: "11px", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
+              NEW STREAM
+            </p>
+            <span className="mono" style={{ fontSize: "9px", color: "var(--muted)", letterSpacing: "0.05em" }}>
+              ArcFlow
+            </span>
+          </div>
 
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div>
               <Label>RECIPIENT ADDRESS</Label>
               <Input
@@ -128,9 +162,7 @@ export default function StreamPage() {
                 onChange={(e) => setMonthly(e.target.value)}
               />
               {rate !== undefined && (
-                <p className="text-xs font-mono mt-1.5" style={{ color: "var(--muted)" }}>
-                  ≈ {rate.toString()} wei/sec
-                </p>
+                <Hint>≈ {rate.toString()} wei/sec</Hint>
               )}
             </div>
 
@@ -143,60 +175,84 @@ export default function StreamPage() {
                 onChange={(e) => setDeposit(e.target.value)}
               />
               {deposit && monthly && Number(monthly) > 0 && (
-                <p className="text-xs font-mono mt-1.5" style={{ color: "var(--muted)" }}>
-                  ≈ {(Number(deposit) / Number(monthly) * 30).toFixed(0)} days of runway
-                </p>
+                <Hint>≈ {(Number(deposit) / Number(monthly) * 30).toFixed(0)} days runway</Hint>
               )}
             </div>
 
             <button
               onClick={handleCreate}
               disabled={!isConnected || busy || !recipient || !monthly || !deposit}
-              className="w-full py-2.5 text-sm font-medium rounded transition-all disabled:opacity-40"
-              style={{ background: "var(--blue)", color: "#fff" }}
+              className="w-full mono transition-all disabled:opacity-30"
+              style={{
+                background: "var(--accent)",
+                color: "var(--bg)",
+                border: "none",
+                padding: "11px",
+                fontSize: "11px",
+                letterSpacing: "0.1em",
+                fontWeight: 500,
+                borderRadius: "2px",
+                cursor: "pointer",
+                fontFamily: "'IBM Plex Mono', monospace",
+              }}
             >
-              {busy ? "Processing…" : "Create Stream →"}
+              {busy ? "PROCESSING…" : "CREATE STREAM →"}
             </button>
 
             {!isConnected && (
-              <p className="text-xs text-center" style={{ color: "var(--muted)" }}>
+              <p className="mono text-center" style={{ fontSize: "10px", color: "var(--muted)" }}>
                 Connect wallet to continue
               </p>
             )}
           </div>
         </div>
 
-        {/* Info panel */}
+        {/* Info */}
         <div className="space-y-4">
-          <div className="p-6 rounded" style={{ border: "1px solid var(--border)" }}>
-            <p className="text-xs font-mono mb-4" style={{ color: "var(--muted)" }}>HOW IT WORKS</p>
-            <div className="space-y-3 text-sm" style={{ color: "var(--muted)" }}>
+          <div style={{ border: "1px solid var(--border)", borderRadius: "3px", padding: "24px" }}>
+            <p className="mono mb-5" style={{ fontSize: "10px", letterSpacing: "0.12em", color: "var(--muted)" }}>
+              HOW IT WORKS
+            </p>
+            <div className="space-y-4">
               {[
                 "Deposit USDC upfront as runway",
                 "Recipient accrues balance every second",
                 "Withdraw anytime, no waiting",
                 "Cancel to recover unspent deposit",
               ].map((s, i) => (
-                <div key={i} className="flex gap-3">
-                  <span className="font-mono text-xs mt-0.5" style={{ color: "var(--blue)" }}>
+                <div key={i} className="flex gap-4">
+                  <span
+                    className="mono shrink-0"
+                    style={{ color: "var(--accent)", fontSize: "10px", marginTop: "1px" }}
+                  >
                     {String(i + 1).padStart(2, "0")}
                   </span>
-                  <span>{s}</span>
+                  <span style={{ fontSize: "13px", color: "var(--text-dim)", lineHeight: 1.5 }}>{s}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="p-6 rounded" style={{ border: "1px solid var(--border)" }}>
-            <p className="text-xs font-mono mb-3" style={{ color: "var(--muted)" }}>CONTRACT</p>
+          <div style={{ border: "1px solid var(--border)", borderRadius: "3px", padding: "16px 20px" }}>
+            <p className="mono mb-2" style={{ fontSize: "10px", letterSpacing: "0.1em", color: "var(--muted)" }}>
+              CONTRACT
+            </p>
             <a
               href={`https://testnet.arcscan.app/address/${CONTRACTS.arcFlow}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-mono break-all hover:text-[#0066FF] transition-colors"
-              style={{ color: "var(--muted)" }}
+              className="mono"
+              style={{
+                fontSize: "10px",
+                color: "var(--text-dim)",
+                wordBreak: "break-all",
+                letterSpacing: "0.02em",
+                textDecoration: "none",
+              }}
+              onMouseOver={e => ((e.target as HTMLElement).style.color = "var(--accent)")}
+              onMouseOut={e => ((e.target as HTMLElement).style.color = "var(--text-dim)")}
             >
-              {CONTRACTS.arcFlow}
+              {CONTRACTS.arcFlow} ↗
             </a>
           </div>
         </div>

@@ -28,7 +28,10 @@ const ABI = [
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <label className="block text-xs font-mono mb-2" style={{ color: "var(--muted)" }}>
+    <label
+      className="block mono mb-2"
+      style={{ color: "var(--muted)", fontSize: "10px", letterSpacing: "0.1em" }}
+    >
       {children}
     </label>
   );
@@ -38,8 +41,20 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className="w-full bg-transparent text-sm font-mono px-3 py-2.5 rounded outline-none focus:border-[#0066FF] transition-colors"
-      style={{ border: "1px solid var(--border)", color: "var(--text)" }}
+      className="w-full mono"
+      style={{
+        background: "transparent",
+        border: "1px solid var(--border)",
+        color: "var(--text)",
+        fontSize: "13px",
+        padding: "10px 12px",
+        outline: "none",
+        borderRadius: "2px",
+        transition: "border-color 0.15s",
+        fontFamily: "'IBM Plex Mono', monospace",
+      }}
+      onFocus={e => (e.target.style.borderColor = "var(--accent)")}
+      onBlur={e => (e.target.style.borderColor = "var(--border)")}
     />
   );
 }
@@ -49,12 +64,9 @@ export default function InvoicePage() {
   const { writeContract, data: hash, isPending } = useWriteContract();
   const { isLoading: isMining, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  // Create
   const [amount, setAmount]       = useState("");
   const [desc, setDesc]           = useState("");
   const [deadline, setDeadline]   = useState("");
-
-  // Pay
   const [payId, setPayId]         = useState("");
   const [payAmount, setPayAmount] = useState("");
 
@@ -87,13 +99,17 @@ export default function InvoicePage() {
 
       {/* Header */}
       <div className="mb-12">
-        <p className="text-xs font-mono mb-3" style={{ color: "var(--blue)" }}>
-          INVOICE
-        </p>
-        <h1 className="text-4xl font-semibold" style={{ letterSpacing: "-0.03em" }}>
+        <div className="flex items-center gap-3 mb-6">
+          <span className="tag">Invoice</span>
+          <span className="mono" style={{ fontSize: "10px", color: "var(--muted)" }}>02 / 03</span>
+        </div>
+        <h1
+          className="mono mb-3"
+          style={{ fontSize: "36px", fontWeight: 300, letterSpacing: "-0.03em", lineHeight: 1.1 }}
+        >
           Request & receive USDC.
         </h1>
-        <p className="mt-3 text-sm" style={{ color: "var(--muted)" }}>
+        <p style={{ color: "var(--text-dim)", fontSize: "14px", lineHeight: 1.7 }}>
           Create an invoice, share the ID. Client pays on-chain, funds arrive instantly.
         </p>
       </div>
@@ -101,9 +117,15 @@ export default function InvoicePage() {
       <div className="grid grid-cols-2 gap-8">
 
         {/* Create */}
-        <div className="p-6 rounded" style={{ border: "1px solid var(--border)" }}>
-          <p className="text-sm font-medium mb-6">Create Invoice</p>
-          <div className="space-y-4">
+        <div style={{ border: "1px solid var(--border)", borderRadius: "3px", padding: "24px" }}>
+          <div className="flex items-center justify-between mb-6">
+            <p className="mono" style={{ fontSize: "11px", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
+              CREATE INVOICE
+            </p>
+            <span className="mono" style={{ fontSize: "9px", color: "var(--muted)" }}>ArcInvoice</span>
+          </div>
+
+          <div className="space-y-5">
             <div>
               <Label>AMOUNT (USDC)</Label>
               <Input
@@ -132,23 +154,40 @@ export default function InvoicePage() {
             <button
               onClick={handleCreate}
               disabled={!isConnected || busy || !amount || !desc}
-              className="w-full py-2.5 text-sm font-medium rounded transition-all disabled:opacity-40"
-              style={{ background: "var(--blue)", color: "#fff" }}
+              className="w-full mono transition-all disabled:opacity-30"
+              style={{
+                background: "var(--accent)",
+                color: "var(--bg)",
+                border: "none",
+                padding: "11px",
+                fontSize: "11px",
+                letterSpacing: "0.1em",
+                fontWeight: 500,
+                borderRadius: "2px",
+                cursor: "pointer",
+                fontFamily: "'IBM Plex Mono', monospace",
+              }}
             >
-              {busy ? "Processing…" : "Create Invoice →"}
+              {busy ? "PROCESSING…" : "CREATE INVOICE →"}
             </button>
             {isSuccess && (
-              <p className="text-xs font-mono text-center" style={{ color: "var(--blue)" }}>
-                Invoice created. Check explorer for ID.
+              <p className="mono text-center" style={{ fontSize: "10px", color: "var(--accent)", letterSpacing: "0.05em" }}>
+                ✓ Invoice created. Check explorer for ID.
               </p>
             )}
           </div>
         </div>
 
         {/* Pay */}
-        <div className="p-6 rounded" style={{ border: "1px solid var(--border)" }}>
-          <p className="text-sm font-medium mb-6">Pay Invoice</p>
-          <div className="space-y-4">
+        <div style={{ border: "1px solid var(--border)", borderRadius: "3px", padding: "24px" }}>
+          <div className="flex items-center justify-between mb-6">
+            <p className="mono" style={{ fontSize: "11px", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
+              PAY INVOICE
+            </p>
+            <span className="mono" style={{ fontSize: "9px", color: "var(--muted)" }}>ArcInvoice</span>
+          </div>
+
+          <div className="space-y-5">
             <div>
               <Label>INVOICE ID</Label>
               <Input
@@ -170,21 +209,45 @@ export default function InvoicePage() {
             <button
               onClick={handlePay}
               disabled={!isConnected || busy || !payId || !payAmount}
-              className="w-full py-2.5 text-sm font-medium rounded transition-all disabled:opacity-40"
-              style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--border)" }}
+              className="w-full mono transition-all disabled:opacity-30"
+              style={{
+                background: "transparent",
+                color: "var(--text-dim)",
+                border: "1px solid var(--border)",
+                padding: "11px",
+                fontSize: "11px",
+                letterSpacing: "0.1em",
+                borderRadius: "2px",
+                cursor: "pointer",
+                fontFamily: "'IBM Plex Mono', monospace",
+                transition: "border-color 0.15s, color 0.15s",
+              }}
+              onMouseOver={e => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent)";
+                (e.currentTarget as HTMLButtonElement).style.color = "var(--accent)";
+              }}
+              onMouseOut={e => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)";
+                (e.currentTarget as HTMLButtonElement).style.color = "var(--text-dim)";
+              }}
             >
-              {busy ? "Processing…" : "Pay Invoice →"}
+              {busy ? "PROCESSING…" : "PAY INVOICE →"}
             </button>
-            <div className="pt-2" style={{ borderTop: "1px solid var(--border)" }}>
-              <p className="text-xs font-mono mb-2" style={{ color: "var(--muted)" }}>CONTRACT</p>
+
+            <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px" }}>
+              <p className="mono mb-2" style={{ fontSize: "10px", letterSpacing: "0.1em", color: "var(--muted)" }}>
+                CONTRACT
+              </p>
               <a
                 href={`https://testnet.arcscan.app/address/${CONTRACTS.arcInvoice}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs font-mono break-all hover:text-[#0066FF] transition-colors"
-                style={{ color: "var(--muted)" }}
+                className="mono"
+                style={{ fontSize: "10px", color: "var(--text-dim)", wordBreak: "break-all", textDecoration: "none" }}
+                onMouseOver={e => ((e.target as HTMLElement).style.color = "var(--accent)")}
+                onMouseOut={e => ((e.target as HTMLElement).style.color = "var(--text-dim)")}
               >
-                {CONTRACTS.arcInvoice}
+                {CONTRACTS.arcInvoice} ↗
               </a>
             </div>
           </div>
