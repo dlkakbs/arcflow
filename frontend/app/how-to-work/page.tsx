@@ -5,201 +5,158 @@ const MODULES = [
     tag: "01",
     href: "/stream",
     title: "Stream",
-    subtitle: "Saniyede USDC gönder",
-    what: "Bir kişiye sürekli ödeme akışı başlatırsın. Para her saniye otomatik olarak birikiyor, alıcı istediği zaman çekebilir.",
+    subtitle: "Send USDC every second",
+    what: "Start a continuous payment flow to any address. Balance accrues every second automatically — the recipient can withdraw whenever they want.",
     useCases: [
-      "Maaş ödemeleri — aylık yerine saniye bazlı",
-      "Freelance çalışanlara proje süreci boyunca ödeme",
-      "Abonelik tabanlı servis ödemeleri",
+      "Salary payments — per second instead of monthly",
+      "Freelancer payments throughout a project",
+      "Subscription-based service payments",
     ],
     steps: [
-      "Cüzdanını bağla (MetaMask veya uyumlu)",
-      "Alıcı adresini gir",
-      "Aylık USDC miktarını belirle",
-      "Başlangıç depozitini yatır (ne kadar süre aktif kalacağını belirler)",
-      'Create Stream → butonuna bas',
+      "Connect your wallet (MetaMask or compatible)",
+      "Enter the recipient address",
+      "Set the monthly USDC amount",
+      "Deposit initial funds (determines how long the stream stays active)",
+      "Click Create Stream →",
     ],
   },
   {
     tag: "02",
     href: "/invoice",
     title: "Invoice",
-    subtitle: "USDC fatura oluştur ve öde",
-    what: "Hizmet veya ürün karşılığı fatura oluşturursun. Karşı taraf fatura ID'siyle ödeme yapar, para anında cüzdanına gelir.",
+    subtitle: "Create and pay USDC invoices",
+    what: "Create an invoice for a service or product. The other party pays using the invoice ID on-chain — funds arrive instantly to your wallet.",
     useCases: [
-      "Freelance iş — tasarım, yazılım, danışmanlık",
-      "Tedarikçilere net vadeli ödeme talebi",
-      "Deadline'lı proje ödemeleri",
+      "Freelance work — design, development, consulting",
+      "Net-term payment requests to suppliers",
+      "Project payments with deadlines",
     ],
     steps: [
-      "Cüzdanını bağla",
-      "USDC miktarını ve açıklamayı gir",
-      "İsteğe bağlı son ödeme tarihi ekle",
-      "Create Invoice → ile fatura oluştur",
-      "Oluşan fatura ID'sini karşı tarafa ilet",
-      "Karşı taraf ID ile Pay Invoice bölümünden öder",
+      "Connect your wallet",
+      "Enter the USDC amount and description",
+      "Optionally add a payment deadline",
+      "Create the invoice with Create Invoice →",
+      "Share the invoice ID with the other party",
+      "They pay via the Pay Invoice section using the ID",
     ],
   },
   {
     tag: "03",
     href: "/paywall",
     title: "Paywall",
-    subtitle: "API başına 0.001 USDC öde",
-    what: "Bir API veya servisi kullanmak için önceden USDC yatırırsın. Her istek otomatik olarak küçük bir miktar düşer. Abonelik yok, API key yok.",
+    subtitle: "Pay 0.001 USDC per API request",
+    what: "Deposit USDC upfront to access a service or API. A small amount is deducted per request automatically. No subscriptions, no API keys.",
     useCases: [
-      "AI agent servislerini kullanım bazlı ödeme",
-      "Veri API'leri — ne kadar çekersen o kadar öde",
-      "Mikro ödeme gerektiren her türlü dijital servis",
+      "Usage-based payments for AI agent services",
+      "Data APIs — pay only for what you fetch",
+      "Any digital service requiring micropayments",
     ],
     steps: [
-      "Cüzdanını bağla",
-      "Kullanmak istediğin kadar USDC yatır",
-      "Her API çağrısında 0.001 USDC otomatik düşer",
-      "Bakiye bitince tekrar yatır",
-      "Kullanmadığın bakiyeyi istediğin zaman geri çek",
+      "Connect your wallet",
+      "Deposit the amount of USDC you want to spend",
+      "0.001 USDC is deducted automatically per API call",
+      "Top up when balance runs low",
+      "Withdraw unused balance at any time",
     ],
   },
 ];
 
 const REQUIREMENTS = [
-  {
-    label: "Cüzdan",
-    value: "MetaMask veya EIP-1193 uyumlu herhangi bir cüzdan",
-  },
-  {
-    label: "Ağ",
-    value: "Arc Testnet — testnet.arcscan.app üzerinden işlemlerini takip edebilirsin",
-  },
-  {
-    label: "Token",
-    value: "USDC — Arc üzerinde native gas token olarak kullanılır, köprü gerekmez",
-  },
+  { label: "Wallet",  value: "MetaMask or any EIP-1193 compatible wallet" },
+  { label: "Network", value: "Arc Testnet — track your transactions at testnet.arcscan.app" },
+  { label: "Token",   value: "USDC — used as the native gas token on Arc, no bridging required" },
 ];
 
 export default function HowToWorkPage() {
   return (
-    <div className="max-w-4xl mx-auto px-8 py-16">
+    <div className="max-w-6xl mx-auto px-12 py-16">
 
       {/* Header */}
       <div className="mb-14">
-        <div className="flex items-center gap-3 mb-6">
-          <span className="tag">Başlangıç Rehberi</span>
-        </div>
-        <h1
-          className="mono mb-4"
-          style={{ fontSize: "40px", fontWeight: 300, letterSpacing: "-0.03em", lineHeight: 1.1 }}
-        >
-          ArcFlow nasıl çalışır?
+        <p className="text-sm font-mono mb-4" style={{ color: "var(--blue)" }}>GET STARTED</p>
+        <h1 className="text-5xl font-semibold mb-6" style={{ letterSpacing: "-0.03em" }}>
+          How ArcFlow works
         </h1>
-        <p style={{ color: "var(--text-dim)", fontSize: "15px", lineHeight: 1.8, maxWidth: "560px" }}>
-          ArcFlow, Arc Testnet üzerinde native USDC ile çalışan bir ödeme altyapısıdır.
-          Üç farklı modül — akış, fatura ve ödeme duvarı — tüm on-chain ödeme ihtiyaçlarını karşılar.
+        <p className="text-xl max-w-xl leading-relaxed" style={{ color: "var(--muted)" }}>
+          ArcFlow is a payment infrastructure built on Arc Testnet using native USDC.
+          Three modules — stream, invoice, and paywall — cover all on-chain payment needs.
         </p>
       </div>
 
       {/* Requirements */}
-      <div className="mb-14" style={{ border: "1px solid var(--border)", borderRadius: "3px", padding: "24px" }}>
-        <p className="mono mb-5" style={{ fontSize: "10px", letterSpacing: "0.12em", color: "var(--muted)" }}>
-          BAŞLAMADAN ÖNCE
-        </p>
-        <div className="space-y-4">
+      <div className="p-8 rounded mb-12" style={{ border: "1px solid var(--border)" }}>
+        <p className="text-sm font-mono mb-6" style={{ color: "var(--muted)" }}>BEFORE YOU START</p>
+        <div className="space-y-5">
           {REQUIREMENTS.map((r) => (
-            <div key={r.label} className="flex gap-6">
-              <span
-                className="mono shrink-0"
-                style={{ fontSize: "10px", letterSpacing: "0.08em", color: "var(--accent)", width: "72px", paddingTop: "2px" }}
-              >
+            <div key={r.label} className="flex gap-8">
+              <span className="font-mono shrink-0 w-20 text-sm" style={{ color: "var(--blue)" }}>
                 {r.label.toUpperCase()}
               </span>
-              <span style={{ fontSize: "13px", color: "var(--text-dim)", lineHeight: 1.6 }}>
-                {r.value}
-              </span>
+              <span className="text-base leading-relaxed" style={{ color: "var(--muted)" }}>{r.value}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Modules */}
+      {/* Module cards */}
       <div className="space-y-6 mb-16">
-        <div className="flex items-center gap-3 mb-2">
-          <span className="mono" style={{ fontSize: "10px", letterSpacing: "0.12em", color: "var(--muted)" }}>
-            MODÜLLER
-          </span>
-          <div style={{ flex: 1, height: "1px", background: "var(--border)" }} />
-        </div>
+        <p className="text-sm font-mono" style={{ color: "var(--muted)" }}>MODULES</p>
 
         {MODULES.map((m) => (
           <div
             key={m.tag}
-            style={{ border: "1px solid var(--border)", borderRadius: "3px", padding: "28px" }}
+            className="group p-8 rounded-2xl transition-all duration-200 hover:-translate-y-0.5"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
           >
-            {/* Module header */}
-            <div className="flex items-start justify-between mb-5">
+            {/* Card header */}
+            <div className="flex items-start justify-between mb-6">
               <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="mono" style={{ fontSize: "10px", color: "var(--muted)" }}>{m.tag}</span>
-                  <span className="tag">{m.title}</span>
-                </div>
-                <p className="mono" style={{ fontSize: "18px", fontWeight: 300, letterSpacing: "-0.02em", color: "var(--text)" }}>
-                  {m.subtitle}
+                <p className="text-sm font-mono mb-2 transition-colors group-hover:text-[#0066FF]" style={{ color: "var(--muted)" }}>
+                  {m.tag}
                 </p>
+                <h2 className="text-3xl font-semibold mb-2 transition-colors group-hover:text-[#0066FF]" style={{ letterSpacing: "-0.02em" }}>
+                  {m.title}
+                </h2>
+                <p className="text-lg" style={{ color: "var(--muted)" }}>{m.subtitle}</p>
               </div>
               <Link
                 href={m.href}
-                className="mono shrink-0"
-                style={{
-                  fontSize: "10px",
-                  letterSpacing: "0.08em",
-                  color: "var(--accent)",
-                  border: "1px solid var(--accent-dim)",
-                  padding: "5px 12px",
-                  borderRadius: "2px",
-                  textDecoration: "none",
-                }}
+                className="text-sm font-mono px-4 py-2 rounded-lg transition-all"
+                style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "var(--bg)" }}
               >
-                AÇ →
+                Open →
               </Link>
             </div>
 
-            {/* What it does */}
-            <p style={{ fontSize: "13px", color: "var(--text-dim)", lineHeight: 1.7, marginBottom: "20px" }}>
+            <p className="text-lg mb-8 leading-relaxed" style={{ color: "var(--muted)" }}>
               {m.what}
             </p>
 
-            <div className="grid grid-cols-2 gap-6">
-              {/* Use cases */}
-              <div>
-                <p className="mono mb-3" style={{ fontSize: "9px", letterSpacing: "0.12em", color: "var(--muted)" }}>
-                  KULLANIM ALANLARI
-                </p>
-                <div className="space-y-2">
-                  {m.useCases.map((u, i) => (
-                    <div key={i} className="flex gap-3">
-                      <span className="mono shrink-0" style={{ color: "var(--accent)", fontSize: "10px", marginTop: "2px" }}>—</span>
-                      <span style={{ fontSize: "12px", color: "var(--text-dim)", lineHeight: 1.5 }}>{u}</span>
-                    </div>
-                  ))}
-                </div>
+            {/* Use cases */}
+            <div className="mb-6">
+              <p className="text-sm font-mono mb-4" style={{ color: "var(--muted)" }}>USE CASES</p>
+              <div className="space-y-3">
+                {m.useCases.map((u, i) => (
+                  <div key={i} className="flex gap-4">
+                    <span className="font-mono shrink-0 text-sm" style={{ color: "var(--blue)", marginTop: "2px" }}>—</span>
+                    <span className="text-base leading-relaxed" style={{ color: "var(--muted)" }}>{u}</span>
+                  </div>
+                ))}
               </div>
+            </div>
 
-              {/* Steps */}
-              <div>
-                <p className="mono mb-3" style={{ fontSize: "9px", letterSpacing: "0.12em", color: "var(--muted)" }}>
-                  NASIL KULLANILIR
-                </p>
-                <div className="space-y-2">
-                  {m.steps.map((s, i) => (
-                    <div key={i} className="flex gap-3">
-                      <span
-                        className="mono shrink-0"
-                        style={{ color: "var(--accent)", fontSize: "9px", marginTop: "3px", minWidth: "16px" }}
-                      >
-                        {String(i + 1).padStart(2, "0")}
-                      </span>
-                      <span style={{ fontSize: "12px", color: "var(--text-dim)", lineHeight: 1.5 }}>{s}</span>
-                    </div>
-                  ))}
-                </div>
+            {/* Steps */}
+            <div>
+              <p className="text-sm font-mono mb-4" style={{ color: "var(--muted)" }}>HOW TO USE</p>
+              <div className="space-y-3">
+                {m.steps.map((s, i) => (
+                  <div key={i} className="flex gap-4">
+                    <span className="font-mono shrink-0 text-sm" style={{ color: "var(--blue)", marginTop: "2px" }}>
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span className="text-base leading-relaxed" style={{ color: "var(--muted)" }}>{s}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -207,49 +164,25 @@ export default function HowToWorkPage() {
       </div>
 
       {/* CTA */}
-      <div
-        className="flex items-center justify-between px-6 py-5"
-        style={{ border: "1px solid var(--accent-dim)", borderRadius: "3px", background: "rgba(0,212,170,0.04)" }}
-      >
+      <div className="flex items-center justify-between p-8 rounded-2xl" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
         <div>
-          <p className="mono mb-1" style={{ fontSize: "13px", color: "var(--text)", letterSpacing: "-0.01em" }}>
-            Hazır mısın?
-          </p>
-          <p style={{ fontSize: "12px", color: "var(--text-dim)" }}>
-            Cüzdanını bağla ve ilk işlemini yap.
-          </p>
+          <p className="text-xl font-semibold mb-2">Ready to get started?</p>
+          <p className="text-base" style={{ color: "var(--muted)" }}>Connect your wallet and make your first transaction.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 shrink-0 ml-8">
           <Link
             href="/stream"
-            className="mono"
-            style={{
-              background: "var(--accent)",
-              color: "#000000",
-              padding: "9px 20px",
-              fontSize: "11px",
-              letterSpacing: "0.1em",
-              fontWeight: 600,
-              borderRadius: "2px",
-              textDecoration: "none",
-            }}
+            className="text-base px-6 py-2.5 rounded font-semibold transition-all hover:opacity-90"
+            style={{ background: "var(--blue)", color: "#fff" }}
           >
-            STREAM →
+            Try Stream →
           </Link>
           <Link
             href="/"
-            className="mono"
-            style={{
-              border: "1px solid var(--border)",
-              color: "var(--text-dim)",
-              padding: "9px 20px",
-              fontSize: "11px",
-              letterSpacing: "0.1em",
-              borderRadius: "2px",
-              textDecoration: "none",
-            }}
+            className="text-base px-6 py-2.5 rounded transition-all hover:border-[#0066FF]"
+            style={{ border: "1px solid var(--border)", color: "var(--muted)" }}
           >
-            ANA SAYFA
+            Home
           </Link>
         </div>
       </div>

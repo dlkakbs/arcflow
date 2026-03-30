@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt } from "wagmi";
-import { parseUnits, formatUnits } from "viem";
+import { parseUnits } from "viem";
 import { CONTRACTS } from "@/lib/wagmi";
 
 const ABI = [
@@ -39,12 +39,19 @@ const ABI = [
   },
 ] as const;
 
+const HOW_TO_USE = [
+  "Connect your wallet (MetaMask or compatible)",
+  "Enter the recipient's wallet address",
+  "Set the monthly USDC amount you want to stream",
+  "Deposit initial funds — this is the runway (e.g. 3 months = 3× monthly amount)",
+  "Click Create Stream → and confirm the transaction",
+  "The recipient can withdraw their accrued balance at any time",
+  "Cancel the stream anytime to recover the remaining deposit",
+];
+
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <label
-      className="block mono mb-2"
-      style={{ color: "var(--muted)", fontSize: "10px", letterSpacing: "0.1em" }}
-    >
+    <label className="block text-base font-mono mb-2" style={{ color: "var(--muted)" }}>
       {children}
     </label>
   );
@@ -54,29 +61,9 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className="w-full mono"
-      style={{
-        background: "transparent",
-        border: "1px solid var(--border)",
-        color: "var(--text)",
-        fontSize: "13px",
-        padding: "10px 12px",
-        outline: "none",
-        borderRadius: "2px",
-        transition: "border-color 0.15s",
-        fontFamily: "'IBM Plex Mono', monospace",
-      }}
-      onFocus={e => (e.target.style.borderColor = "var(--accent)")}
-      onBlur={e => (e.target.style.borderColor = "var(--border)")}
+      className="w-full bg-transparent text-base font-mono px-4 py-3 rounded outline-none focus:border-[#0066FF] transition-colors"
+      style={{ border: "1px solid var(--border)", color: "var(--text)" }}
     />
-  );
-}
-
-function Hint({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mono mt-1.5" style={{ color: "var(--muted)", fontSize: "10px", letterSpacing: "0.03em" }}>
-      {children}
-    </p>
   );
 }
 
@@ -111,150 +98,87 @@ export default function StreamPage() {
   const busy = isPending || isMining;
 
   return (
-    <div className="max-w-4xl mx-auto px-8 py-16">
+    <div className="max-w-6xl mx-auto px-12 py-16">
 
       {/* Header */}
       <div className="mb-12">
-        <div className="flex items-center gap-3 mb-6">
-          <span className="tag">Stream</span>
-          <span className="mono" style={{ fontSize: "10px", color: "var(--muted)" }}>01 / 03</span>
-        </div>
-        <h1
-          className="mono mb-3"
-          style={{ fontSize: "36px", fontWeight: 300, letterSpacing: "-0.03em", lineHeight: 1.1 }}
-        >
+        <p className="text-base font-mono mb-4" style={{ color: "var(--blue)" }}>STREAM</p>
+        <h1 className="font-semibold mb-5" style={{ fontSize: "52px", letterSpacing: "-0.03em" }}>
           Continuous payments.
         </h1>
-        <p style={{ color: "var(--text-dim)", fontSize: "14px", lineHeight: 1.7 }}>
+        <p className="text-xl" style={{ color: "var(--muted)" }}>
           USDC flows every second. Recipients withdraw whenever they want.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-8">
+      {/* How to use — first */}
+      <div className="p-8 rounded mb-8" style={{ border: "1px solid var(--border)" }}>
+        <p className="text-base font-mono mb-6" style={{ color: "var(--muted)" }}>HOW TO USE</p>
+        <div className="space-y-4">
+          {HOW_TO_USE.map((s, i) => (
+            <div key={i} className="flex gap-5">
+              <span className="font-mono shrink-0 text-base" style={{ color: "var(--blue)", marginTop: "2px" }}>
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <span className="text-lg" style={{ color: "var(--muted)", lineHeight: 1.6 }}>{s}</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
-        {/* Create stream */}
-        <div style={{ border: "1px solid var(--border)", borderRadius: "3px", padding: "24px" }}>
-          <div className="flex items-center justify-between mb-6">
-            <p className="mono" style={{ fontSize: "11px", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
-              NEW STREAM
-            </p>
-            <span className="mono" style={{ fontSize: "9px", color: "var(--muted)", letterSpacing: "0.05em" }}>
-              ArcFlow
-            </span>
+      {/* Action form */}
+      <div className="p-8 rounded" style={{ border: "1px solid var(--border)" }}>
+        <p className="text-lg font-semibold mb-8">New Stream</p>
+        <div className="space-y-6">
+          <div>
+            <Label>RECIPIENT ADDRESS</Label>
+            <Input
+              placeholder="0x..."
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value)}
+            />
           </div>
-
-          <div className="space-y-5">
-            <div>
-              <Label>RECIPIENT ADDRESS</Label>
-              <Input
-                placeholder="0x..."
-                value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label>MONTHLY AMOUNT (USDC)</Label>
-              <Input
-                type="number"
-                placeholder="1000"
-                value={monthly}
-                onChange={(e) => setMonthly(e.target.value)}
-              />
-              {rate !== undefined && (
-                <Hint>≈ {rate.toString()} wei/sec</Hint>
-              )}
-            </div>
-
-            <div>
-              <Label>INITIAL DEPOSIT (USDC)</Label>
-              <Input
-                type="number"
-                placeholder="3000"
-                value={deposit}
-                onChange={(e) => setDeposit(e.target.value)}
-              />
-              {deposit && monthly && Number(monthly) > 0 && (
-                <Hint>≈ {(Number(deposit) / Number(monthly) * 30).toFixed(0)} days runway</Hint>
-              )}
-            </div>
-
-            <button
-              onClick={handleCreate}
-              disabled={!isConnected || busy || !recipient || !monthly || !deposit}
-              className="w-full mono transition-all disabled:opacity-30"
-              style={{
-                background: "var(--accent)",
-                color: "var(--bg)",
-                border: "none",
-                padding: "11px",
-                fontSize: "11px",
-                letterSpacing: "0.1em",
-                fontWeight: 500,
-                borderRadius: "2px",
-                cursor: "pointer",
-                fontFamily: "'IBM Plex Mono', monospace",
-              }}
-            >
-              {busy ? "PROCESSING…" : "CREATE STREAM →"}
-            </button>
-
-            {!isConnected && (
-              <p className="mono text-center" style={{ fontSize: "10px", color: "var(--muted)" }}>
-                Connect wallet to continue
+          <div>
+            <Label>MONTHLY AMOUNT (USDC)</Label>
+            <Input
+              type="number"
+              placeholder="1000"
+              value={monthly}
+              onChange={(e) => setMonthly(e.target.value)}
+            />
+            {rate !== undefined && (
+              <p className="text-sm font-mono mt-2" style={{ color: "var(--muted)" }}>
+                ≈ {rate.toString()} wei/sec
               </p>
             )}
           </div>
-        </div>
-
-        {/* Info */}
-        <div className="space-y-4">
-          <div style={{ border: "1px solid var(--border)", borderRadius: "3px", padding: "24px" }}>
-            <p className="mono mb-5" style={{ fontSize: "10px", letterSpacing: "0.12em", color: "var(--muted)" }}>
-              HOW IT WORKS
-            </p>
-            <div className="space-y-4">
-              {[
-                "Deposit USDC upfront as runway",
-                "Recipient accrues balance every second",
-                "Withdraw anytime, no waiting",
-                "Cancel to recover unspent deposit",
-              ].map((s, i) => (
-                <div key={i} className="flex gap-4">
-                  <span
-                    className="mono shrink-0"
-                    style={{ color: "var(--accent)", fontSize: "10px", marginTop: "1px" }}
-                  >
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span style={{ fontSize: "13px", color: "var(--text-dim)", lineHeight: 1.5 }}>{s}</span>
-                </div>
-              ))}
-            </div>
+          <div>
+            <Label>INITIAL DEPOSIT (USDC)</Label>
+            <Input
+              type="number"
+              placeholder="3000"
+              value={deposit}
+              onChange={(e) => setDeposit(e.target.value)}
+            />
+            {deposit && monthly && Number(monthly) > 0 && (
+              <p className="text-sm font-mono mt-2" style={{ color: "var(--muted)" }}>
+                ≈ {(Number(deposit) / Number(monthly) * 30).toFixed(0)} days of runway
+              </p>
+            )}
           </div>
-
-          <div style={{ border: "1px solid var(--border)", borderRadius: "3px", padding: "16px 20px" }}>
-            <p className="mono mb-2" style={{ fontSize: "10px", letterSpacing: "0.1em", color: "var(--muted)" }}>
-              CONTRACT
+          <button
+            onClick={handleCreate}
+            disabled={!isConnected || busy || !recipient || !monthly || !deposit}
+            className="w-full py-4 text-lg font-semibold rounded transition-all disabled:opacity-40"
+            style={{ background: "var(--blue)", color: "#fff" }}
+          >
+            {busy ? "Processing…" : "Create Stream →"}
+          </button>
+          {!isConnected && (
+            <p className="text-base text-center" style={{ color: "var(--muted)" }}>
+              Connect wallet to continue
             </p>
-            <a
-              href={`https://testnet.arcscan.app/address/${CONTRACTS.arcFlow}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mono"
-              style={{
-                fontSize: "10px",
-                color: "var(--text-dim)",
-                wordBreak: "break-all",
-                letterSpacing: "0.02em",
-                textDecoration: "none",
-              }}
-              onMouseOver={e => ((e.target as HTMLElement).style.color = "var(--accent)")}
-              onMouseOut={e => ((e.target as HTMLElement).style.color = "var(--text-dim)")}
-            >
-              {CONTRACTS.arcFlow} ↗
-            </a>
-          </div>
+          )}
         </div>
       </div>
     </div>

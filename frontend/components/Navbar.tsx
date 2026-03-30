@@ -23,107 +23,58 @@ export function Navbar() {
 
   return (
     <nav
-      className="flex items-center justify-between px-8 py-4"
-      style={{ borderBottom: "1px solid var(--border)", background: "rgba(5,5,8,0.95)", backdropFilter: "blur(12px)", position: "sticky", top: 0, zIndex: 100 }}
+      className="flex items-center justify-between px-12 py-4"
+      style={{
+        background: "#FFFFFF",
+        borderBottom: "1px solid #E2E8F0",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+      }}
     >
       {/* Logo */}
-      <Link href="/" className="flex items-center gap-3 group">
-        <span
-          className="mono text-xs px-2 py-1"
-          style={{
-            background: "transparent",
-            color: "var(--accent)",
-            border: "1px solid var(--accent-dim)",
-            letterSpacing: "0.15em",
-            borderRadius: "2px",
-          }}
-        >
-          ARC
-        </span>
-        <span
-          className="font-semibold tracking-tight"
-          style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "14px", letterSpacing: "-0.01em" }}
-        >
-          Flow
-        </span>
-        <span
-          className="mono text-xs"
-          style={{ color: "var(--muted)", fontSize: "10px", letterSpacing: "0.05em" }}
-        >
-          v1.0
-        </span>
+      <Link href="/" className="flex items-center gap-1">
+        <span style={{ fontWeight: 800, fontSize: "24px", color: "#0F172A", letterSpacing: "-0.03em" }}>ARC</span>
+        <span style={{ fontWeight: 800, fontSize: "24px", color: "var(--blue)", letterSpacing: "-0.03em" }}>Flow</span>
       </Link>
 
       {/* Tabs */}
-      <div className="flex items-center gap-0" style={{ border: "1px solid var(--border)", borderRadius: "3px", overflow: "hidden" }}>
-        {NAV.map((n, i) => {
+      <div className="flex items-center gap-1">
+        {NAV.map((n) => {
           const active = pathname.startsWith(n.href);
           return (
             <Link
               key={n.href}
               href={n.href}
-              className="mono text-xs px-5 py-2 transition-all"
+              className="px-5 py-2 rounded-lg transition-all text-base font-medium"
               style={{
-                color:      active ? "var(--bg)" : "var(--muted)",
-                background: active ? "var(--accent)" : "transparent",
-                borderRight: i < NAV.length - 1 ? "1px solid var(--border)" : undefined,
-                letterSpacing: "0.08em",
-                fontWeight: active ? 500 : 400,
+                color:      active ? "var(--blue)" : "var(--muted)",
+                background: active ? "var(--blue-light)" : "transparent",
               }}
             >
-              {n.label.toUpperCase()}
+              {n.label}
             </Link>
           );
         })}
       </div>
 
-      {/* Status + Wallet */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2" style={{ color: "var(--muted)" }}>
-          <span
-            className="w-1.5 h-1.5 rounded-full"
-            style={{
-              background: isConnected ? "var(--accent)" : "var(--muted)",
-              boxShadow: isConnected ? "0 0 6px var(--accent)" : "none",
-              animation: isConnected ? "flicker 3s ease infinite" : "none",
-            }}
-          />
-          <span className="mono text-xs" style={{ fontSize: "10px", letterSpacing: "0.05em" }}>
-            {isConnected ? "TESTNET" : "DISCONNECTED"}
-          </span>
-        </div>
-
-        {isConnected ? (
-          <button
-            onClick={() => disconnect()}
-            className="mono flex items-center gap-2 text-xs px-3 py-1.5 transition-all"
-            style={{
-              border: "1px solid var(--border)",
-              color: "var(--text-dim)",
-              borderRadius: "2px",
-              fontSize: "11px",
-              letterSpacing: "0.05em",
-            }}
-          >
-            {shortAddr(address!)}
-            <span style={{ color: "var(--muted)" }}>✕</span>
-          </button>
-        ) : (
-          <button
-            onClick={() => connect({ connector: injected() })}
-            className="mono text-xs px-4 py-1.5 font-medium transition-all"
-            style={{
-              background: "var(--accent)",
-              color: "var(--bg)",
-              borderRadius: "2px",
-              letterSpacing: "0.08em",
-              fontSize: "11px",
-            }}
-          >
-            CONNECT →
-          </button>
-        )}
-      </div>
+      {/* Wallet */}
+      {isConnected ? (
+        <button
+          onClick={() => disconnect()}
+          className="flex items-center gap-2 mono px-4 py-2 rounded-lg transition-all text-base"
+          style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "#fff" }}
+        >
+          <span className="w-2 h-2 rounded-full" style={{ background: "#22C55E" }} />
+          {shortAddr(address!)}
+        </button>
+      ) : (
+        <button
+          onClick={() => connect({ connector: injected() })}
+          className="px-5 py-2 rounded-lg font-semibold transition-all text-base hover:opacity-90"
+          style={{ background: "var(--blue)", color: "#fff" }}
+        >
+          Connect Wallet
+        </button>
+      )}
     </nav>
   );
 }

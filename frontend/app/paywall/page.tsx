@@ -43,12 +43,19 @@ const ABI = [
   },
 ] as const;
 
+const HOW_TO_USE = [
+  "Connect your wallet (MetaMask or compatible)",
+  "Deposit USDC — this becomes your request credit balance",
+  "Each API call automatically deducts 0.001 USDC from your balance",
+  "Payments are signed off-chain — no gas fee per call",
+  "The service provider settles periodically on-chain",
+  "Top up your balance whenever it runs low",
+  "Withdraw any unused balance at any time",
+];
+
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <label
-      className="block mono mb-2"
-      style={{ color: "var(--muted)", fontSize: "10px", letterSpacing: "0.1em" }}
-    >
+    <label className="block text-base font-mono mb-2" style={{ color: "var(--muted)" }}>
       {children}
     </label>
   );
@@ -58,29 +65,17 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className="w-full mono"
-      style={{
-        background: "transparent",
-        border: "1px solid var(--border)",
-        color: "var(--text)",
-        fontSize: "13px",
-        padding: "10px 12px",
-        outline: "none",
-        borderRadius: "2px",
-        transition: "border-color 0.15s",
-        fontFamily: "'IBM Plex Mono', monospace",
-      }}
-      onFocus={e => (e.target.style.borderColor = "var(--accent)")}
-      onBlur={e => (e.target.style.borderColor = "var(--border)")}
+      className="w-full bg-transparent text-base font-mono px-4 py-3 rounded outline-none focus:border-[#0066FF] transition-colors"
+      style={{ border: "1px solid var(--border)", color: "var(--text)" }}
     />
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: "3px", padding: "16px 20px", background: "var(--surface)" }}>
-      <p className="mono mb-2" style={{ fontSize: "9px", letterSpacing: "0.12em", color: "var(--muted)" }}>{label}</p>
-      <p className="mono" style={{ fontSize: "22px", fontWeight: 400, letterSpacing: "-0.02em", color: "var(--text)" }}>{value}</p>
+    <div className="p-5 rounded" style={{ border: "1px solid var(--border)" }}>
+      <p className="text-sm font-mono mb-2" style={{ color: "var(--muted)" }}>{label}</p>
+      <p className="text-3xl font-semibold font-mono" style={{ letterSpacing: "-0.02em" }}>{value}</p>
     </div>
   );
 }
@@ -128,143 +123,79 @@ export default function PaywallPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-8 py-16">
+    <div className="max-w-6xl mx-auto px-12 py-16">
 
       {/* Header */}
       <div className="mb-12">
-        <div className="flex items-center gap-3 mb-6">
-          <span className="tag">Paywall</span>
-          <span className="mono" style={{ fontSize: "10px", color: "var(--muted)" }}>03 / 03</span>
-        </div>
-        <h1
-          className="mono mb-3"
-          style={{ fontSize: "36px", fontWeight: 300, letterSpacing: "-0.03em", lineHeight: 1.1 }}
-        >
+        <p className="text-base font-mono mb-4" style={{ color: "var(--blue)" }}>PAYWALL</p>
+        <h1 className="font-semibold mb-5" style={{ fontSize: "52px", letterSpacing: "-0.03em" }}>
           Pay per request.
         </h1>
-        <p style={{ color: "var(--text-dim)", fontSize: "14px", lineHeight: 1.7 }}>
+        <p className="text-xl" style={{ color: "var(--muted)" }}>
           Deposit USDC once. Every API call costs{" "}
-          <span className="mono" style={{ color: "var(--accent)" }}>
+          <span className="font-mono" style={{ color: "var(--text)" }}>
             {price !== undefined ? formatUnits(price, 6) : "0.001"} USDC
           </span>
           . No subscriptions, no API keys.
         </p>
       </div>
 
+      {/* How to use — first */}
+      <div className="p-8 rounded mb-8" style={{ border: "1px solid var(--border)" }}>
+        <p className="text-base font-mono mb-6" style={{ color: "var(--muted)" }}>HOW TO USE</p>
+        <div className="space-y-4">
+          {HOW_TO_USE.map((s, i) => (
+            <div key={i} className="flex gap-5">
+              <span className="font-mono shrink-0 text-base" style={{ color: "var(--blue)", marginTop: "2px" }}>
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <span className="text-lg" style={{ color: "var(--muted)", lineHeight: 1.6 }}>{s}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Stats */}
       {isConnected && (
-        <div className="grid grid-cols-3 gap-3 mb-10">
-          <StatCard
-            label="BALANCE"
-            value={balance !== undefined ? `${formatUnits(balance, 6)} USDC` : "—"}
-          />
-          <StatCard
-            label="REQUESTS REMAINING"
-            value={remaining !== undefined ? remaining.toString() : "—"}
-          />
-          <StatCard
-            label="PRICE / REQUEST"
-            value={price !== undefined ? `${formatUnits(price, 6)} USDC` : "—"}
-          />
+        <div className="grid grid-cols-3 gap-5 mb-8">
+          <Stat label="BALANCE" value={balance !== undefined ? `${formatUnits(balance, 6)} USDC` : "—"} />
+          <Stat label="REQUESTS REMAINING" value={remaining !== undefined ? remaining.toString() : "—"} />
+          <Stat label="PRICE / REQUEST" value={price !== undefined ? `${formatUnits(price, 6)} USDC` : "—"} />
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-8">
-
-        {/* Deposit */}
-        <div style={{ border: "1px solid var(--border)", borderRadius: "3px", padding: "24px" }}>
-          <div className="flex items-center justify-between mb-6">
-            <p className="mono" style={{ fontSize: "11px", letterSpacing: "0.08em", color: "var(--text-dim)" }}>
-              DEPOSIT CREDITS
-            </p>
-            <span className="mono" style={{ fontSize: "9px", color: "var(--muted)" }}>ArcPaywall</span>
-          </div>
-
-          <div className="space-y-5">
-            <div>
-              <Label>AMOUNT (USDC)</Label>
-              <Input
-                type="number"
-                placeholder="1.00"
-                step="0.001"
-                value={depositAmt}
-                onChange={(e) => setDepositAmt(e.target.value)}
-              />
-              {depositAmt && price !== undefined && (
-                <p className="mono mt-1.5" style={{ fontSize: "10px", color: "var(--muted)" }}>
-                  = {Math.floor(Number(depositAmt) / Number(formatUnits(price, 6)))} requests
-                </p>
-              )}
-            </div>
-
-            <button
-              onClick={handleDeposit}
-              disabled={!isConnected || busy || !depositAmt}
-              className="w-full mono transition-all disabled:opacity-30"
-              style={{
-                background: "var(--accent)",
-                color: "var(--bg)",
-                border: "none",
-                padding: "11px",
-                fontSize: "11px",
-                letterSpacing: "0.1em",
-                fontWeight: 500,
-                borderRadius: "2px",
-                cursor: "pointer",
-                fontFamily: "'IBM Plex Mono', monospace",
-              }}
-            >
-              {busy ? "PROCESSING…" : "DEPOSIT →"}
-            </button>
-
-            {!isConnected && (
-              <p className="mono text-center" style={{ fontSize: "10px", color: "var(--muted)" }}>
-                Connect wallet to continue
+      {/* Deposit form */}
+      <div className="p-8 rounded" style={{ border: "1px solid var(--border)" }}>
+        <p className="text-lg font-semibold mb-8">Deposit Credits</p>
+        <div className="space-y-6 max-w-lg">
+          <div>
+            <Label>AMOUNT (USDC)</Label>
+            <Input
+              type="number"
+              placeholder="1.00"
+              step="0.001"
+              value={depositAmt}
+              onChange={(e) => setDepositAmt(e.target.value)}
+            />
+            {depositAmt && price !== undefined && (
+              <p className="text-base font-mono mt-2" style={{ color: "var(--muted)" }}>
+                = {Math.floor(Number(depositAmt) / Number(formatUnits(price, 6)))} requests
               </p>
             )}
           </div>
-        </div>
-
-        {/* How it works */}
-        <div className="space-y-4">
-          <div style={{ border: "1px solid var(--border)", borderRadius: "3px", padding: "24px" }}>
-            <p className="mono mb-5" style={{ fontSize: "10px", letterSpacing: "0.12em", color: "var(--muted)" }}>
-              HOW IT WORKS
+          <button
+            onClick={handleDeposit}
+            disabled={!isConnected || busy || !depositAmt}
+            className="w-full py-4 text-lg font-semibold rounded transition-all disabled:opacity-40"
+            style={{ background: "var(--blue)", color: "#fff" }}
+          >
+            {busy ? "Processing…" : "Deposit →"}
+          </button>
+          {!isConnected && (
+            <p className="text-base text-center" style={{ color: "var(--muted)" }}>
+              Connect wallet to continue
             </p>
-            <div className="space-y-4">
-              {[
-                "Deposit USDC to get request credits",
-                "Each API call deducts 0.001 USDC",
-                "Payments signed off-chain — no gas per call",
-                "Agent owner batch settles periodically",
-                "Withdraw unused balance anytime",
-              ].map((s, i) => (
-                <div key={i} className="flex gap-4">
-                  <span className="mono shrink-0" style={{ color: "var(--accent)", fontSize: "10px", marginTop: "1px" }}>
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span style={{ fontSize: "13px", color: "var(--text-dim)", lineHeight: 1.5 }}>{s}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ border: "1px solid var(--border)", borderRadius: "3px", padding: "16px 20px" }}>
-            <p className="mono mb-2" style={{ fontSize: "10px", letterSpacing: "0.1em", color: "var(--muted)" }}>
-              CONTRACT
-            </p>
-            <a
-              href={`https://testnet.arcscan.app/address/${CONTRACTS.arcPaywall}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mono"
-              style={{ fontSize: "10px", color: "var(--text-dim)", wordBreak: "break-all", textDecoration: "none" }}
-              onMouseOver={e => ((e.target as HTMLElement).style.color = "var(--accent)")}
-              onMouseOut={e => ((e.target as HTMLElement).style.color = "var(--text-dim)")}
-            >
-              {CONTRACTS.arcPaywall} ↗
-            </a>
-          </div>
+          )}
         </div>
       </div>
     </div>
