@@ -91,14 +91,15 @@ export default function Home() {
 
         <div className="mt-8 flex items-center gap-4">
           <Link
-            href="/stream"
+            href="/how-to-work"
             className="mono text-xs px-6 py-2.5 transition-all"
             style={{
               background: "var(--accent)",
-              color: "var(--bg)",
+              color: "#000000",
               letterSpacing: "0.1em",
               borderRadius: "2px",
-              fontWeight: 500,
+              fontWeight: 600,
+              border: "2px solid var(--accent)",
             }}
           >
             GET STARTED →
