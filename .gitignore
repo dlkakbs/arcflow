@@ -1,0 +1,15 @@
+# Foundry
+out/
+cache/
+broadcast/*/
+
+# Environment
+.env
+*.env
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+
+# macOS
+.DS_Store
