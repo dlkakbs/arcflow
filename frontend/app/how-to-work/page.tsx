@@ -47,9 +47,9 @@ const MODULES = [
 ];
 
 const REQUIREMENTS = [
-  { label: "Wallet", value: "MetaMask or any EIP-1193 compatible wallet" },
+  { label: "Wallet", value: "EVM-compatible" },
   { label: "Network", value: "Arc Testnet" },
-  { label: "Token", value: "Native USDC used throughout the flow" },
+  { label: "Token", value: "Native USDC" },
 ];
 
 export default function HowToWorkPage() {
@@ -79,7 +79,7 @@ export default function HowToWorkPage() {
 
         <section className="mb-8">
           <div className="rounded-[2rem] border border-white/12 bg-white/8 p-7 backdrop-blur-xl md:p-8">
-            <p className="text-sm uppercase tracking-[0.24em] text-white/50">Before you start</p>
+            <p className="text-sm uppercase tracking-[0.24em] text-white/50">What you need</p>
             <div className="mt-6 grid gap-4 md:grid-cols-3">
               {REQUIREMENTS.map((item) => (
                 <div key={item.label} className="rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
