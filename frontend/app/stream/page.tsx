@@ -302,8 +302,23 @@ export default function StreamPage() {
                       <ArrowUpRight className="h-4 w-4" />
                     </button>
                     {isSuccess && (
-                      <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7]">
-                        Stream created. Live status is loading below.
+                      <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7] space-y-2">
+                        {streamId !== null ? (
+                          <p>Stream created. Your stream ID is <span className="font-bold text-white text-base">#{streamId.toString()}</span> — live status is loading below.</p>
+                        ) : (
+                          <p>Stream created. Live status is loading below.</p>
+                        )}
+                        {hash && (
+                          <a
+                            href={`https://testnet.arcscan.app/tx/${hash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 font-medium text-[#ffb38a] underline underline-offset-2"
+                          >
+                            View transaction
+                            <ArrowUpRight className="h-3.5 w-3.5" />
+                          </a>
+                        )}
                       </div>
                     )}
                     {!isConnected && <p className="text-sm text-white/45">Connect wallet to continue.</p>}
