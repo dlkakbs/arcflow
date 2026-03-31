@@ -305,9 +305,9 @@ export default function StreamPage() {
                     {isSuccess && (
                       <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7] space-y-2">
                         {streamId !== null ? (
-                          <p>Stream created. Your stream ID is <span className="font-bold text-white text-base">#{streamId.toString()}</span> — live status is loading below.</p>
+                          <p>Stream created. Your stream ID is <span className="font-bold text-white text-base">#{streamId.toString()}</span> — enter this ID below to track the live status.</p>
                         ) : (
-                          <p>Stream created. Live status is loading below.</p>
+                          <p>Stream created. Enter your stream ID below to track the live status.</p>
                         )}
                         {hash && (
                           <a
