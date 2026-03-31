@@ -149,6 +149,9 @@ export default function StreamPage() {
   const { writeContract, data: hash, isPending } = useWriteContract();
   const { isLoading: isMining, isSuccess, data: receipt } = useWaitForTransactionReceipt({ hash });
 
+  const { writeContract: writeWithdraw, data: withdrawHash, isPending: isWithdrawPending } = useWriteContract();
+  const { isLoading: isWithdrawMining, isSuccess: isWithdrawSuccess } = useWaitForTransactionReceipt({ hash: withdrawHash });
+
   const [recipient, setRecipient] = useState("");
   const [monthly, setMonthly] = useState("");
   const [deposit, setDeposit] = useState("");
@@ -201,7 +204,7 @@ export default function StreamPage() {
   // ── Active streams ──────────────────────────────────────────────────────
   const { address } = useAccount();
 
-  const { data: streamCount } = useReadContract({
+  const { data: streamCount, refetch: refetchStreamCount } = useReadContract({
     address: CONTRACTS.arcFlow,
     abi: ABI,
     functionName: "streamCount",
@@ -263,16 +266,26 @@ export default function StreamPage() {
   // Extract stream ID from receipt logs after creation
   useEffect(() => {
     if (!receipt) return;
+    let found = false;
     for (const log of receipt.logs) {
       try {
         const decoded = decodeEventLog({ abi: ABI, eventName: "StreamCreated", data: log.data, topics: log.topics });
         setStreamId((decoded.args as { id: bigint }).id);
+        found = true;
         break;
       } catch {
         continue;
       }
     }
-  }, [receipt]);
+    // Fallback: if StreamCreated event not decoded, refetch streamCount and use count-1
+    if (!found) {
+      refetchStreamCount().then(({ data }) => {
+        if (data !== undefined && data > 0n) {
+          setStreamId(data - 1n);
+        }
+      });
+    }
+  }, [receipt, refetchStreamCount]);
 
   // payer[0], recipient[1], rate[2], startTime[3], deposit[4], withdrawn[5], active[6]
   const streamArr = streamData as readonly [string, string, bigint, bigint, bigint, bigint, boolean] | undefined;
@@ -357,7 +370,23 @@ export default function StreamPage() {
                     <div>
                       <Label>Monthly amount (USDC)</Label>
                       <Input type="number" placeholder="1000" value={monthly} onChange={(e) => setMonthly(e.target.value)} />
-                      {rate !== undefined && <p className="mt-2 text-sm text-white/45">≈ {rate.toString()} wei/sec</p>}
+                      {rate !== undefined && (() => {
+                        const actualMonthly = Number(rate) * 2_592_000 / 1_000_000;
+                        const inputMonthly = Number(monthly);
+                        const loss = inputMonthly > 0 ? Math.abs(inputMonthly - actualMonthly) / inputMonthly : 0;
+                        return (
+                          <>
+                            <p className="mt-2 text-sm text-white/45">
+                              On-chain: {actualMonthly.toFixed(4)} USDC/month ({rate.toString()} wei/sec)
+                            </p>
+                            {loss > 0.01 && (
+                              <p className="mt-1 text-sm text-yellow-400/75">
+                                Note: contract will stream {actualMonthly.toFixed(4)} USDC/month due to integer precision.
+                              </p>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                     <div>
                       <Label>Initial deposit (USDC)</Label>
@@ -428,8 +457,8 @@ export default function StreamPage() {
                       <Radio className="h-5 w-5 text-[#ffb38a]" />
                     </div>
                     <div>
-                      <p className="text-sm uppercase tracking-[0.24em] text-white/50">Live stream status</p>
-                      <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Check any stream by ID</h2>
+                      <p className="text-sm uppercase tracking-[0.24em] text-white/50">Stream lookup</p>
+                      <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Check your incoming stream</h2>
                     </div>
                   </div>
                   {streamArr?.[6] && (
@@ -468,11 +497,43 @@ export default function StreamPage() {
                 </div>
 
                 {!activeId && (
-                  <p className="text-sm text-white/40">Enter a stream ID above, or create a stream — status will appear automatically.</p>
+                  <p className="text-sm text-white/40">If someone is streaming USDC to you, enter the stream ID here to see your withdrawable balance and stream details.</p>
                 )}
 
                 {activeId !== null && !streamArr && (
                   <p className="text-sm text-white/40">Loading stream data...</p>
+                )}
+
+                {streamArr && streamArr[6] && (
+                  <div className="mb-4 flex items-center gap-4 flex-wrap">
+                    <button
+                      onClick={() => {
+                        if (activeId === null) return;
+                        writeWithdraw({
+                          address: CONTRACTS.arcFlow,
+                          abi: ABI,
+                          functionName: "withdraw",
+                          args: [activeId],
+                        });
+                      }}
+                      disabled={!isConnected || isWithdrawPending || isWithdrawMining || withdrawableRaw === 0n}
+                      className="inline-flex items-center gap-2 rounded-full bg-[#fff4ec] px-5 py-3 text-sm font-semibold text-[#291c28] transition disabled:opacity-40"
+                    >
+                      {isWithdrawPending || isWithdrawMining ? "Withdrawing..." : "Withdraw now"}
+                      <ArrowUpRight className="h-4 w-4" />
+                    </button>
+                    {isWithdrawSuccess && withdrawHash && (
+                      <a
+                        href={`https://testnet.arcscan.app/tx/${withdrawHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm font-medium text-[#ffb38a] underline underline-offset-2"
+                      >
+                        Withdrawn. View transaction
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                      </a>
+                    )}
+                  </div>
                 )}
 
                 {streamArr && (
