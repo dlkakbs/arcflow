@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useAccount, useReadContract, useReadContracts, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { decodeEventLog, formatUnits, parseUnits } from "viem";
 import { CONTRACTS } from "@/lib/wagmi";
 import { ArrowUpRight, Sparkles, Wallet, Activity, Radio } from "lucide-react";
@@ -66,6 +66,13 @@ const ABI = [
     type: "function",
     stateMutability: "view",
     inputs: [{ name: "id", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    name: "streamCount",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
     outputs: [{ name: "", type: "uint256" }],
   },
   {
@@ -190,6 +197,68 @@ export default function StreamPage() {
     args: activeId !== null ? [activeId] : undefined,
     query: { enabled: activeId !== null, refetchInterval: 10000 },
   });
+
+  // ── Active streams ──────────────────────────────────────────────────────
+  const { address } = useAccount();
+
+  const { data: streamCount } = useReadContract({
+    address: CONTRACTS.arcFlow,
+    abi: ABI,
+    functionName: "streamCount",
+    query: { refetchInterval: 15000 },
+  });
+
+  const totalStreams = streamCount !== undefined ? Number(streamCount) : 0;
+
+  const streamCalls = useMemo(() =>
+    Array.from({ length: totalStreams }, (_, i) => ({
+      address: CONTRACTS.arcFlow as `0x${string}`,
+      abi: ABI,
+      functionName: "streams" as const,
+      args: [BigInt(i)] as [bigint],
+    })),
+  [totalStreams]);
+
+  const withdrawableCalls = useMemo(() =>
+    Array.from({ length: totalStreams }, (_, i) => ({
+      address: CONTRACTS.arcFlow as `0x${string}`,
+      abi: ABI,
+      functionName: "withdrawable" as const,
+      args: [BigInt(i)] as [bigint],
+    })),
+  [totalStreams]);
+
+  const { data: allStreamsRaw } = useReadContracts({
+    contracts: streamCalls,
+    query: { enabled: totalStreams > 0, refetchInterval: 10000 },
+  });
+
+  const { data: allWithdrawableRaw } = useReadContracts({
+    contracts: withdrawableCalls,
+    query: { enabled: totalStreams > 0, refetchInterval: 8000 },
+  });
+
+  const myStreams = useMemo(() => {
+    if (!allStreamsRaw || !address) return [];
+    return allStreamsRaw
+      .map((res, i) => {
+        if (res.status !== "success") return null;
+        const s = res.result as readonly [string, string, bigint, bigint, bigint, bigint, boolean];
+        if (s[0].toLowerCase() !== address.toLowerCase()) return null;
+        const withdrawableVal = allWithdrawableRaw?.[i]?.status === "success"
+          ? (allWithdrawableRaw[i].result as bigint)
+          : 0n;
+        return { id: i, payer: s[0], recipient: s[1], rate: s[2], startTime: s[3], deposit: s[4], withdrawn: s[5], active: s[6], withdrawable: withdrawableVal };
+      })
+      .filter(Boolean) as Array<{ id: number; payer: string; recipient: string; rate: bigint; startTime: bigint; deposit: bigint; withdrawn: bigint; active: boolean; withdrawable: bigint }>;
+  }, [allStreamsRaw, allWithdrawableRaw, address]);
+
+  const activeMyStreams = myStreams.filter((s) => s.active);
+
+  const totalMonthlyOut = activeMyStreams.reduce((acc, s) => acc + Number(formatUnits(s.rate, 6)) * 2_592_000, 0);
+  const totalDeposited = activeMyStreams.reduce((acc, s) => acc + Number(formatUnits(s.deposit, 6)), 0);
+
+  // ── End active streams ───────────────────────────────────────────────────
 
   // Extract stream ID from receipt logs after creation
   useEffect(() => {
@@ -452,6 +521,78 @@ export default function StreamPage() {
               </div>
             </GlassCard>
           </Reveal>
+
+          {/* Active streams */}
+          {isConnected && activeMyStreams.length > 0 && (
+            <Reveal>
+              <GlassCard className="overflow-hidden">
+                <div className="border-b border-white/10 p-7 md:p-8">
+                  <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm uppercase tracking-[0.24em] text-white/50">Your streams</p>
+                      <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Active streams</h2>
+                    </div>
+                    <div className="flex flex-wrap gap-4">
+                      <div className="rounded-[1.2rem] border border-white/10 bg-black/20 px-5 py-3 text-center">
+                        <div className="text-xl font-semibold text-white">{activeMyStreams.length}</div>
+                        <div className="mt-0.5 text-xs text-white/45 uppercase tracking-[0.18em]">Active</div>
+                      </div>
+                      <div className="rounded-[1.2rem] border border-white/10 bg-black/20 px-5 py-3 text-center">
+                        <div className="text-xl font-semibold text-white">{totalMonthlyOut.toFixed(2)} USDC</div>
+                        <div className="mt-0.5 text-xs text-white/45 uppercase tracking-[0.18em]">Monthly outflow</div>
+                      </div>
+                      <div className="rounded-[1.2rem] border border-white/10 bg-black/20 px-5 py-3 text-center">
+                        <div className="text-xl font-semibold text-white">{totalDeposited.toFixed(2)} USDC</div>
+                        <div className="mt-0.5 text-xs text-white/45 uppercase tracking-[0.18em]">Total deposited</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-7 md:p-8">
+                  {/* Header row */}
+                  <div className="mb-3 hidden grid-cols-[2fr_1.5fr_1.5fr_80px] gap-4 px-4 text-xs uppercase tracking-[0.2em] text-white/35 md:grid">
+                    <span>Recipient</span>
+                    <span>Monthly</span>
+                    <span>Withdrawable</span>
+                    <span>Status</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {activeMyStreams.map((s) => (
+                      <div
+                        key={s.id}
+                        className="grid grid-cols-1 gap-3 rounded-2xl border border-white/8 bg-black/15 p-4 md:grid-cols-[2fr_1.5fr_1.5fr_80px] md:items-center md:gap-4"
+                      >
+                        <div>
+                          <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Recipient</p>
+                          <span className="font-mono text-sm text-white">{shortAddr(s.recipient)}</span>
+                        </div>
+                        <div>
+                          <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Monthly</p>
+                          <span className="text-sm text-white">
+                            {(Number(formatUnits(s.rate, 6)) * 2_592_000).toFixed(2)} USDC
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Withdrawable</p>
+                          <span className="text-sm font-medium text-[#ffb38a]">
+                            {Number(formatUnits(s.withdrawable, 6)).toFixed(4)} USDC
+                          </span>
+                        </div>
+                        <div>
+                          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            Live
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </GlassCard>
+            </Reveal>
+          )}
         </div>
       </main>
     </div>
