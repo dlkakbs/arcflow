@@ -6,7 +6,7 @@ import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { injected } from "wagmi/connectors";
 
 const NAV = [
-  { href: "/stream",  label: "Stream"  },
+  { href: "/stream", label: "Stream" },
   { href: "/invoice", label: "Invoice" },
   { href: "/paywall", label: "Paywall" },
 ];
@@ -22,59 +22,54 @@ export function Navbar() {
   const { disconnect } = useDisconnect();
 
   return (
-    <nav
-      className="flex items-center justify-between px-12 py-4"
-      style={{
-        background: "#FFFFFF",
-        borderBottom: "1px solid #E2E8F0",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-      }}
-    >
-      {/* Logo */}
-      <Link href="/" className="flex items-center gap-1">
-        <span style={{ fontWeight: 800, fontSize: "24px", color: "#0F172A", letterSpacing: "-0.03em" }}>ARC</span>
-        <span style={{ fontWeight: 800, fontSize: "24px", color: "var(--blue)", letterSpacing: "-0.03em" }}>Flow</span>
-      </Link>
+    <nav className="sticky top-0 z-50 px-4 pt-4 md:px-8 lg:px-10">
+      <div className="mx-auto flex max-w-7xl items-center justify-between rounded-[1.6rem] border border-white/12 bg-white/8 px-4 py-3 backdrop-blur-xl shadow-[0_10px_40px_rgba(0,0,0,0.18)] md:px-6">
+        <Link href="/" className="flex items-center gap-2">
+          <span className="text-[22px] font-extrabold tracking-[-0.05em] text-white md:text-[24px]">
+            ARC
+          </span>
+          <span className="text-[22px] font-extrabold tracking-[-0.05em] text-[#ffb38a] md:text-[24px]">
+            Flow
+          </span>
+        </Link>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1">
-        {NAV.map((n) => {
-          const active = pathname.startsWith(n.href);
-          return (
-            <Link
-              key={n.href}
-              href={n.href}
-              className="px-5 py-2 rounded-lg transition-all text-base font-medium"
-              style={{
-                color:      active ? "var(--blue)" : "var(--muted)",
-                background: active ? "var(--blue-light)" : "transparent",
-              }}
-            >
-              {n.label}
-            </Link>
-          );
-        })}
+        <div className="hidden items-center gap-2 md:flex">
+          {NAV.map((n) => {
+            const active = pathname.startsWith(n.href);
+
+            return (
+              <Link
+                key={n.href}
+                href={n.href}
+                className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
+                  active
+                    ? "border border-white/14 bg-white/12 text-white"
+                    : "text-white/62 hover:bg-white/8 hover:text-white"
+                }`}
+              >
+                {n.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        {isConnected ? (
+          <button
+            onClick={() => disconnect()}
+            className="inline-flex items-center gap-2 rounded-full border border-white/14 bg-black/20 px-4 py-2 text-sm font-medium text-white/85 transition hover:bg-white/10"
+          >
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            <span className="font-mono">{shortAddr(address!)}</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => connect({ connector: injected() })}
+            className="rounded-full bg-[#fff4ec] px-4 py-2 text-sm font-semibold text-[#291c28] transition hover:-translate-y-0.5"
+          >
+            Connect Wallet
+          </button>
+        )}
       </div>
-
-      {/* Wallet */}
-      {isConnected ? (
-        <button
-          onClick={() => disconnect()}
-          className="flex items-center gap-2 mono px-4 py-2 rounded-lg transition-all text-base"
-          style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "#fff" }}
-        >
-          <span className="w-2 h-2 rounded-full" style={{ background: "#22C55E" }} />
-          {shortAddr(address!)}
-        </button>
-      ) : (
-        <button
-          onClick={() => connect({ connector: injected() })}
-          className="px-5 py-2 rounded-lg font-semibold transition-all text-base hover:opacity-90"
-          style={{ background: "var(--blue)", color: "#fff" }}
-        >
-          Connect Wallet
-        </button>
-      )}
     </nav>
   );
 }

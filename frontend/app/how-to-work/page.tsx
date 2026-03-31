@@ -1,191 +1,154 @@
 import Link from "next/link";
+import { Sparkles, Waves, Receipt, LockKeyhole, ArrowUpRight } from "lucide-react";
 
 const MODULES = [
   {
-    tag: "01",
     href: "/stream",
     title: "Stream",
     subtitle: "Send USDC every second",
-    what: "Start a continuous payment flow to any address. Balance accrues every second automatically — the recipient can withdraw whenever they want.",
+    what: "Start a continuous payment flow to any address. Balance accrues every second automatically, and the recipient can withdraw whenever they want.",
     useCases: [
-      "Salary payments — per second instead of monthly",
-      "Freelancer payments throughout a project",
-      "Subscription-based service payments",
+      "Salary payments that feel continuous instead of monthly",
+      "Freelancer retainers during a project",
+      "Subscription-style service payments",
     ],
-    steps: [
-      "Connect your wallet (MetaMask or compatible)",
-      "Enter the recipient address",
-      "Set the monthly USDC amount",
-      "Deposit initial funds (determines how long the stream stays active)",
-      "Click Create Stream →",
-    ],
+    icon: Waves,
+    accent: "text-[#ffb38a]",
+    glow: "from-[#ffb38a]/25 via-white/5 to-transparent",
   },
   {
-    tag: "02",
     href: "/invoice",
     title: "Invoice",
-    subtitle: "Create and pay USDC invoices",
-    what: "Create an invoice for a service or product. The other party pays using the invoice ID on-chain — funds arrive instantly to your wallet.",
+    subtitle: "Create and settle USDC invoices",
+    what: "Create an invoice for a product or service and share the ID. The other party pays on-chain and funds arrive directly to your wallet.",
     useCases: [
-      "Freelance work — design, development, consulting",
-      "Net-term payment requests to suppliers",
-      "Project payments with deadlines",
+      "Freelance design, development, or consulting work",
+      "Supplier or vendor payment requests",
+      "Deadline-based project payments",
     ],
-    steps: [
-      "Connect your wallet",
-      "Enter the USDC amount and description",
-      "Optionally add a payment deadline",
-      "Create the invoice with Create Invoice →",
-      "Share the invoice ID with the other party",
-      "They pay via the Pay Invoice section using the ID",
-    ],
+    icon: Receipt,
+    accent: "text-[#ffd7c7]",
+    glow: "from-[#ffd7c7]/30 via-white/5 to-transparent",
   },
   {
-    tag: "03",
     href: "/paywall",
     title: "Paywall",
     subtitle: "Pay 0.001 USDC per API request",
-    what: "Deposit USDC upfront to access a service or API. A small amount is deducted per request automatically. No subscriptions, no API keys.",
+    what: "Deposit USDC upfront to unlock access to a service or API. A tiny amount gets deducted automatically per request.",
     useCases: [
-      "Usage-based payments for AI agent services",
-      "Data APIs — pay only for what you fetch",
-      "Any digital service requiring micropayments",
+      "AI agent usage-based billing",
+      "Data APIs paid by actual usage",
+      "Micropayment-based digital access",
     ],
-    steps: [
-      "Connect your wallet",
-      "Deposit the amount of USDC you want to spend",
-      "0.001 USDC is deducted automatically per API call",
-      "Top up when balance runs low",
-      "Withdraw unused balance at any time",
-    ],
+    icon: LockKeyhole,
+    accent: "text-[#ffb38a]",
+    glow: "from-[#ffb38a]/20 via-white/5 to-transparent",
   },
 ];
 
 const REQUIREMENTS = [
-  { label: "Wallet",  value: "MetaMask or any EIP-1193 compatible wallet" },
-  { label: "Network", value: "Arc Testnet — track your transactions at testnet.arcscan.app" },
-  { label: "Token",   value: "USDC — used as the native gas token on Arc, no bridging required" },
+  { label: "Wallet", value: "MetaMask or any EIP-1193 compatible wallet" },
+  { label: "Network", value: "Arc Testnet" },
+  { label: "Token", value: "Native USDC used throughout the flow" },
 ];
 
 export default function HowToWorkPage() {
   return (
-    <div className="max-w-6xl mx-auto px-12 py-16">
+    <div className="min-h-screen overflow-hidden bg-[#120f1d] text-white">
+      <div className="fixed inset-0 -z-20 bg-[linear-gradient(180deg,#120f1d_0%,#1d1530_42%,#0f1722_100%)]" />
+      <div className="fixed inset-0 -z-10 opacity-90 bg-[radial-gradient(circle_at_12%_18%,rgba(255,179,138,0.18),transparent_24%),radial-gradient(circle_at_82%_14%,rgba(255,215,199,0.12),transparent_22%),radial-gradient(circle_at_68%_55%,rgba(255,140,80,0.10),transparent_28%),radial-gradient(circle_at_18%_78%,rgba(255,179,138,0.08),transparent_22%)]" />
 
-      {/* Header */}
-      <div className="mb-14">
-        <p className="text-sm font-mono mb-4" style={{ color: "var(--blue)" }}>GET STARTED</p>
-        <h1 className="text-5xl font-semibold mb-6" style={{ letterSpacing: "-0.03em" }}>
-          How ArcFlow works
-        </h1>
-        <p className="text-xl max-w-xl leading-relaxed" style={{ color: "var(--muted)" }}>
-          ArcFlow is a payment infrastructure built on Arc Testnet using native USDC.
-          Three modules — stream, invoice, and paywall — cover all on-chain payment needs.
-        </p>
-      </div>
-
-      {/* Requirements */}
-      <div className="p-8 rounded mb-12" style={{ border: "1px solid var(--border)" }}>
-        <p className="text-sm font-mono mb-6" style={{ color: "var(--muted)" }}>BEFORE YOU START</p>
-        <div className="space-y-5">
-          {REQUIREMENTS.map((r) => (
-            <div key={r.label} className="flex gap-8">
-              <span className="font-mono shrink-0 w-20 text-sm" style={{ color: "var(--blue)" }}>
-                {r.label.toUpperCase()}
-              </span>
-              <span className="text-base leading-relaxed" style={{ color: "var(--muted)" }}>{r.value}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Module cards */}
-      <div className="space-y-6 mb-16">
-        <p className="text-sm font-mono" style={{ color: "var(--muted)" }}>MODULES</p>
-
-        {MODULES.map((m) => (
-          <div
-            key={m.tag}
-            className="group p-8 rounded-2xl transition-all duration-200 hover:-translate-y-0.5"
-            style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
-          >
-            {/* Card header */}
-            <div className="flex items-start justify-between mb-6">
-              <div>
-                <p className="text-sm font-mono mb-2 transition-colors group-hover:text-[#0066FF]" style={{ color: "var(--muted)" }}>
-                  {m.tag}
-                </p>
-                <h2 className="text-3xl font-semibold mb-2 transition-colors group-hover:text-[#0066FF]" style={{ letterSpacing: "-0.02em" }}>
-                  {m.title}
-                </h2>
-                <p className="text-lg" style={{ color: "var(--muted)" }}>{m.subtitle}</p>
-              </div>
-              <Link
-                href={m.href}
-                className="text-sm font-mono px-4 py-2 rounded-lg transition-all"
-                style={{ border: "1px solid var(--border)", color: "var(--muted)", background: "var(--bg)" }}
-              >
-                Open →
-              </Link>
+      <main className="mx-auto max-w-7xl px-6 pb-24 pt-10 md:px-10 lg:px-12">
+        <section className="flex min-h-[72vh] items-center justify-center">
+          <div className="max-w-4xl text-center">
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-[11px] uppercase tracking-[0.28em] text-[#ffd7c7] backdrop-blur-md">
+              <Sparkles className="h-3.5 w-3.5" /> Get started · ArcFlow
             </div>
 
-            <p className="text-lg mb-8 leading-relaxed" style={{ color: "var(--muted)" }}>
-              {m.what}
+            <h1 className="mt-8 text-5xl font-semibold leading-[0.9] tracking-[-0.06em] text-white md:text-7xl lg:text-[86px]">
+              How ArcFlow
+              <span className="block text-[#ffb38a]">actually works</span>
+              <span className="block text-white/85">across every payment flow.</span>
+            </h1>
+
+            <p className="mx-auto mt-8 max-w-2xl text-lg leading-8 text-white/68 md:text-[21px]">
+              ArcFlow brings stream, invoice, and paywall logic into one on-chain payment system built around native USDC on Arc Testnet.
             </p>
+          </div>
+        </section>
 
-            {/* Use cases */}
-            <div className="mb-6">
-              <p className="text-sm font-mono mb-4" style={{ color: "var(--muted)" }}>USE CASES</p>
-              <div className="space-y-3">
-                {m.useCases.map((u, i) => (
-                  <div key={i} className="flex gap-4">
-                    <span className="font-mono shrink-0 text-sm" style={{ color: "var(--blue)", marginTop: "2px" }}>—</span>
-                    <span className="text-base leading-relaxed" style={{ color: "var(--muted)" }}>{u}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Steps */}
-            <div>
-              <p className="text-sm font-mono mb-4" style={{ color: "var(--muted)" }}>HOW TO USE</p>
-              <div className="space-y-3">
-                {m.steps.map((s, i) => (
-                  <div key={i} className="flex gap-4">
-                    <span className="font-mono shrink-0 text-sm" style={{ color: "var(--blue)", marginTop: "2px" }}>
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <span className="text-base leading-relaxed" style={{ color: "var(--muted)" }}>{s}</span>
-                  </div>
-                ))}
-              </div>
+        <section className="mb-8">
+          <div className="rounded-[2rem] border border-white/12 bg-white/8 p-7 backdrop-blur-xl md:p-8">
+            <p className="text-sm uppercase tracking-[0.24em] text-white/50">Before you start</p>
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              {REQUIREMENTS.map((item) => (
+                <div key={item.label} className="rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
+                  <div className="text-xs uppercase tracking-[0.22em] text-white/45">{item.label}</div>
+                  <div className="mt-3 text-base leading-7 text-white/75">{item.value}</div>
+                </div>
+              ))}
             </div>
           </div>
-        ))}
-      </div>
+        </section>
 
-      {/* CTA */}
-      <div className="flex items-center justify-between p-8 rounded-2xl" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-        <div>
-          <p className="text-xl font-semibold mb-2">Ready to get started?</p>
-          <p className="text-base" style={{ color: "var(--muted)" }}>Connect your wallet and make your first transaction.</p>
-        </div>
-        <div className="flex gap-3 shrink-0 ml-8">
-          <Link
-            href="/stream"
-            className="text-base px-6 py-2.5 rounded font-semibold transition-all hover:opacity-90"
-            style={{ background: "var(--blue)", color: "#fff" }}
-          >
-            Try Stream →
-          </Link>
-          <Link
-            href="/"
-            className="text-base px-6 py-2.5 rounded transition-all hover:border-[#0066FF]"
-            style={{ border: "1px solid var(--border)", color: "var(--muted)" }}
-          >
-            Home
-          </Link>
-        </div>
-      </div>
+        <section className="space-y-6">
+          {MODULES.map((m) => {
+            const Icon = m.icon;
+            return (
+              <div
+                key={m.title}
+                className="relative overflow-hidden rounded-[2rem] border border-white/12 bg-white/8 p-7 backdrop-blur-xl md:p-8"
+              >
+                <div className={`absolute inset-0 bg-gradient-to-br ${m.glow} opacity-80`} />
+                <div className="relative">
+                  <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+                    <div className="max-w-2xl">
+                      <div className="rounded-2xl border border-white/12 bg-black/20 p-3 w-fit">
+                        <Icon className={`h-5 w-5 ${m.accent}`} />
+                      </div>
+
+                      <h2 className="mt-6 text-3xl font-semibold tracking-[-0.04em] text-white md:text-4xl">
+                        {m.title}
+                      </h2>
+                      <p className="mt-2 text-lg text-white/60">{m.subtitle}</p>
+                      <p className="mt-5 max-w-2xl text-base leading-8 text-white/72">{m.what}</p>
+                    </div>
+
+                    <Link
+                      href={m.href}
+                      className="inline-flex items-center justify-center gap-2 rounded-full border border-white/14 bg-white/8 px-5 py-3 text-sm font-medium text-white"
+                    >
+                      Try it
+                      <ArrowUpRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+
+                  <div className="mt-8">
+                    <p className="text-sm uppercase tracking-[0.22em] text-white/45">Use cases</p>
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                      {m.useCases.map((u) => (
+                        <div key={u} className="rounded-2xl border border-white/8 bg-black/15 p-4 text-sm leading-7 text-white/72">
+                          {u}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </section>
+
+        <section className="mt-8">
+          <div className="flex flex-col gap-4 rounded-[2rem] border border-white/12 bg-white/8 p-7 backdrop-blur-xl md:flex-row md:items-center md:justify-between md:p-8">
+            <div>
+              <h3 className="text-2xl font-semibold tracking-[-0.03em]">Ready to try it?</h3>
+              <p className="mt-2 text-base text-white/65">Start with stream, invoice, or paywall and test the flow on Arc.</p>
+            </div>
+
+          </div>
+        </section>
+      </main>
     </div>
   );
 }

@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { motion } from "framer-motion";
+import { useAccount, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { parseUnits } from "viem";
 import { CONTRACTS } from "@/lib/wagmi";
+import { ArrowUpRight, Sparkles } from "lucide-react";
 
 const ABI = [
   {
@@ -11,9 +13,9 @@ const ABI = [
     type: "function",
     stateMutability: "nonpayable",
     inputs: [
-      { name: "amount",      type: "uint256" },
-      { name: "description", type: "string"  },
-      { name: "deadline",    type: "uint256" },
+      { name: "amount", type: "uint256" },
+      { name: "description", type: "string" },
+      { name: "deadline", type: "uint256" },
     ],
     outputs: [{ name: "id", type: "uint256" }],
   },
@@ -26,30 +28,48 @@ const ABI = [
   },
 ] as const;
 
-const HOW_TO_USE = [
-  "Connect your wallet (MetaMask or compatible)",
-  "Enter the USDC amount and a description for the invoice",
-  "Optionally set a payment deadline",
-  "Click Create Invoice → and confirm — an invoice ID will be generated",
-  "Share the invoice ID with the person who needs to pay",
-  "The payer enters the invoice ID and amount in the Pay Invoice section",
-  "Funds arrive in your wallet instantly once paid",
-];
+const reveal = {
+  hidden: { opacity: 0, y: 36 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+function Reveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <motion.div
+      variants={reveal}
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, amount: 0.18 }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div
+      className={`rounded-[2rem] border border-white/12 bg-white/8 backdrop-blur-xl shadow-[0_20px_80px_rgba(0,0,0,0.22)] ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
 
 function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <label className="block text-base font-mono mb-2" style={{ color: "var(--muted)" }}>
-      {children}
-    </label>
-  );
+  return <label className="mb-2 block text-sm uppercase tracking-[0.22em] text-white/55">{children}</label>;
 }
 
 function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className="w-full bg-transparent text-base font-mono px-4 py-3 rounded outline-none focus:border-[#0066FF] transition-colors"
-      style={{ border: "1px solid var(--border)", color: "var(--text)" }}
+      className="w-full rounded-2xl border border-white/12 bg-black/20 px-4 py-3.5 text-white outline-none transition focus:border-white/30"
     />
   );
 }
@@ -59,10 +79,10 @@ export default function InvoicePage() {
   const { writeContract, data: hash, isPending } = useWriteContract();
   const { isLoading: isMining, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  const [amount, setAmount]       = useState("");
-  const [desc, setDesc]           = useState("");
-  const [deadline, setDeadline]   = useState("");
-  const [payId, setPayId]         = useState("");
+  const [amount, setAmount] = useState("");
+  const [desc, setDesc] = useState("");
+  const [deadline, setDeadline] = useState("");
+  const [payId, setPayId] = useState("");
   const [payAmount, setPayAmount] = useState("");
 
   const busy = isPending || isMining;
@@ -90,115 +110,113 @@ export default function InvoicePage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-12 py-16">
+    <div className="min-h-screen overflow-hidden bg-[#120f1d] text-white">
+      <div className="fixed inset-0 -z-20 bg-[linear-gradient(180deg,#120f1d_0%,#1d1530_42%,#0f1722_100%)]" />
+      <div className="fixed inset-0 -z-10 opacity-90 bg-[radial-gradient(circle_at_14%_18%,rgba(255,207,184,0.18),transparent_24%),radial-gradient(circle_at_82%_14%,rgba(255,179,138,0.12),transparent_22%),radial-gradient(circle_at_68%_55%,rgba(255,140,80,0.10),transparent_28%),radial-gradient(circle_at_18%_78%,rgba(255,215,199,0.08),transparent_22%)]" />
 
-      {/* Header */}
-      <div className="mb-12">
-        <p className="text-base font-mono mb-4" style={{ color: "var(--blue)" }}>INVOICE</p>
-        <h1 className="font-semibold mb-5" style={{ fontSize: "52px", letterSpacing: "-0.03em" }}>
-          Request & receive USDC.
-        </h1>
-        <p className="text-xl" style={{ color: "var(--muted)" }}>
-          Create an invoice, share the ID. Client pays on-chain, funds arrive instantly.
-        </p>
-      </div>
+      <main className="mx-auto max-w-7xl px-6 pb-24 pt-10 md:px-10 lg:px-12">
+        <Reveal className="flex min-h-[72vh] items-center justify-center">
+          <div className="max-w-4xl text-center">
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-[11px] uppercase tracking-[0.28em] text-[#ffd7c7] backdrop-blur-md">
+              <Sparkles className="h-3.5 w-3.5" /> Invoice · exact payment requests
+            </div>
 
-      {/* How to use — first */}
-      <div className="p-8 rounded mb-8" style={{ border: "1px solid var(--border)" }}>
-        <p className="text-base font-mono mb-6" style={{ color: "var(--muted)" }}>HOW TO USE</p>
-        <div className="space-y-4">
-          {HOW_TO_USE.map((s, i) => (
-            <div key={i} className="flex gap-5">
-              <span className="font-mono shrink-0 text-base" style={{ color: "var(--blue)", marginTop: "2px" }}>
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <span className="text-lg" style={{ color: "var(--muted)", lineHeight: 1.6 }}>{s}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+            <h1 className="mt-8 text-5xl font-semibold leading-[0.9] tracking-[-0.06em] text-white md:text-7xl lg:text-[86px]">
+              Request payment
+              <span className="block text-[#ffb38a]">cleanly</span>
+              <span className="block text-white/85">and get paid on-chain.</span>
+            </h1>
 
-      {/* Action forms */}
-      <div className="grid grid-cols-2 gap-8">
+            <p className="mx-auto mt-8 max-w-2xl text-lg leading-8 text-white/68 md:text-[21px]">
+              Create a precise USDC invoice, share the ID, and let the other party settle it directly on Arc.
+            </p>
+          </div>
+        </Reveal>
 
-        {/* Create */}
-        <div className="p-8 rounded" style={{ border: "1px solid var(--border)" }}>
-          <p className="text-lg font-semibold mb-8">Create Invoice</p>
-          <div className="space-y-6">
-            <div>
-              <Label>AMOUNT (USDC)</Label>
-              <Input
-                type="number"
-                placeholder="500"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>DESCRIPTION</Label>
-              <Input
-                placeholder="Logo design, March consulting…"
-                value={desc}
-                onChange={(e) => setDesc(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>DEADLINE (optional)</Label>
-              <Input
-                type="date"
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-              />
-            </div>
-            <button
-              onClick={handleCreate}
-              disabled={!isConnected || busy || !amount || !desc}
-              className="w-full py-4 text-lg font-semibold rounded transition-all disabled:opacity-40"
-              style={{ background: "var(--blue)", color: "#fff" }}
-            >
-              {busy ? "Processing…" : "Create Invoice →"}
-            </button>
-            {isSuccess && (
-              <p className="text-base font-mono text-center" style={{ color: "var(--blue)" }}>
-                ✓ Invoice created. Check explorer for ID.
-              </p>
-            )}
+        <div className="grid gap-6">
+          <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
+            <Reveal className="h-full">
+              <GlassCard className="h-full overflow-hidden flex flex-col">
+                <div className="border-b border-white/10 p-7 md:p-8">
+                  <p className="text-sm uppercase tracking-[0.24em] text-white/50">Create invoice</p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">Set amount, description, deadline</h2>
+                </div>
+
+                <div className="space-y-5 p-7 md:p-8">
+                  <div>
+                    <Label>Amount (USDC)</Label>
+                    <Input type="number" placeholder="500" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                  </div>
+
+                  <div>
+                    <Label>Description</Label>
+                    <Input
+                      placeholder="Logo design, monthly consulting..."
+                      value={desc}
+                      onChange={(e) => setDesc(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Deadline (optional)</Label>
+                    <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+                  </div>
+
+                  <button
+                    onClick={handleCreate}
+                    disabled={!isConnected || busy || !amount || !desc}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#fff4ec] px-6 py-4 text-sm font-semibold text-[#291c28] transition disabled:opacity-40"
+                  >
+                    {busy ? "Processing..." : "Create invoice"}
+                    <ArrowUpRight className="h-4 w-4" />
+                  </button>
+
+                  {isSuccess && (
+                    <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7]">
+                      Invoice created. Check the explorer for the generated ID.
+                    </div>
+                  )}
+                </div>
+              </GlassCard>
+            </Reveal>
+
+            <Reveal className="h-full">
+              <GlassCard className="h-full overflow-hidden flex flex-col">
+                <div className="border-b border-white/10 p-7 md:p-8">
+                  <p className="text-sm uppercase tracking-[0.24em] text-white/50">Pay invoice</p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">Use the invoice ID to settle</h2>
+                </div>
+
+                <div className="space-y-5 p-7 md:p-8">
+                  <div>
+                    <Label>Invoice ID</Label>
+                    <Input type="number" placeholder="0" value={payId} onChange={(e) => setPayId(e.target.value)} />
+                  </div>
+
+                  <div>
+                    <Label>Amount (USDC)</Label>
+                    <Input
+                      type="number"
+                      placeholder="500"
+                      value={payAmount}
+                      onChange={(e) => setPayAmount(e.target.value)}
+                    />
+                  </div>
+
+                  <button
+                    onClick={handlePay}
+                    disabled={!isConnected || busy || !payId || !payAmount}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/14 bg-white/8 px-6 py-4 text-sm font-semibold text-white transition disabled:opacity-40"
+                  >
+                    {busy ? "Processing..." : "Pay invoice"}
+                    <ArrowUpRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </GlassCard>
+            </Reveal>
           </div>
         </div>
-
-        {/* Pay */}
-        <div className="p-8 rounded" style={{ border: "1px solid var(--border)" }}>
-          <p className="text-lg font-semibold mb-8">Pay Invoice</p>
-          <div className="space-y-6">
-            <div>
-              <Label>INVOICE ID</Label>
-              <Input
-                type="number"
-                placeholder="0"
-                value={payId}
-                onChange={(e) => setPayId(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>AMOUNT (USDC)</Label>
-              <Input
-                type="number"
-                placeholder="500"
-                value={payAmount}
-                onChange={(e) => setPayAmount(e.target.value)}
-              />
-            </div>
-            <button
-              onClick={handlePay}
-              disabled={!isConnected || busy || !payId || !payAmount}
-              className="w-full py-4 text-lg font-semibold rounded transition-all disabled:opacity-40"
-              style={{ background: "transparent", color: "var(--text)", border: "1px solid var(--border)" }}
-            >
-              {busy ? "Processing…" : "Pay Invoice →"}
-            </button>
-          </div>
-        </div>
-      </div>
+      </main>
     </div>
   );
 }

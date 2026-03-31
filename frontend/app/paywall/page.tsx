@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt } from "wagmi";
-import { parseUnits, formatUnits } from "viem";
+import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { formatUnits, parseUnits } from "viem";
 import { CONTRACTS } from "@/lib/wagmi";
+import { ArrowUpRight, Sparkles, Wallet, Gauge, Coins } from "lucide-react";
 
 const ABI = [
   {
@@ -43,39 +45,60 @@ const ABI = [
   },
 ] as const;
 
-const HOW_TO_USE = [
-  "Connect your wallet (MetaMask or compatible)",
-  "Deposit USDC — this becomes your request credit balance",
-  "Each API call automatically deducts 0.001 USDC from your balance",
-  "Payments are signed off-chain — no gas fee per call",
-  "The service provider settles periodically on-chain",
-  "Top up your balance whenever it runs low",
-  "Withdraw any unused balance at any time",
-];
+const reveal = {
+  hidden: { opacity: 0, y: 36 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+function Reveal({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <motion.div
+      variants={reveal}
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, amount: 0.18 }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div
+      className={`rounded-[2rem] border border-white/12 bg-white/8 backdrop-blur-xl shadow-[0_20px_80px_rgba(0,0,0,0.22)] ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
 
 function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <label className="block text-base font-mono mb-2" style={{ color: "var(--muted)" }}>
-      {children}
-    </label>
-  );
+  return <label className="mb-2 block text-sm uppercase tracking-[0.22em] text-white/55">{children}</label>;
 }
 
 function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className="w-full bg-transparent text-base font-mono px-4 py-3 rounded outline-none focus:border-[#0066FF] transition-colors"
-      style={{ border: "1px solid var(--border)", color: "var(--text)" }}
+      className="w-full rounded-2xl border border-white/12 bg-black/20 px-4 py-3.5 text-white outline-none transition focus:border-white/30"
     />
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
-    <div className="p-5 rounded" style={{ border: "1px solid var(--border)" }}>
-      <p className="text-sm font-mono mb-2" style={{ color: "var(--muted)" }}>{label}</p>
-      <p className="text-3xl font-semibold font-mono" style={{ letterSpacing: "-0.02em" }}>{value}</p>
+    <div className="rounded-[1.6rem] border border-white/10 bg-black/20 p-5">
+      <div className="flex items-center gap-3">
+        <div className="text-[#ffd7c7]">{icon}</div>
+        <p className="text-xs uppercase tracking-[0.22em] text-white/45">{label}</p>
+      </div>
+      <div className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-white">{value}</div>
     </div>
   );
 }
@@ -122,82 +145,95 @@ export default function PaywallPage() {
     });
   }
 
+  const requestEstimate = useMemo(() => {
+    if (!depositAmt || price === undefined) return null;
+    const numericPrice = Number(formatUnits(price, 6));
+    if (!numericPrice) return null;
+    return Math.floor(Number(depositAmt) / numericPrice);
+  }, [depositAmt, price]);
+
   return (
-    <div className="max-w-6xl mx-auto px-12 py-16">
+    <div className="min-h-screen overflow-hidden bg-[#120f1d] text-white">
+      <div className="fixed inset-0 -z-20 bg-[linear-gradient(180deg,#120f1d_0%,#1d1530_42%,#0f1722_100%)]" />
+      <div className="fixed inset-0 -z-10 opacity-90 bg-[radial-gradient(circle_at_14%_18%,rgba(255,179,138,0.18),transparent_24%),radial-gradient(circle_at_82%_14%,rgba(255,215,199,0.12),transparent_22%),radial-gradient(circle_at_68%_55%,rgba(255,140,80,0.10),transparent_28%),radial-gradient(circle_at_18%_78%,rgba(255,179,138,0.08),transparent_22%)]" />
 
-      {/* Header */}
-      <div className="mb-12">
-        <p className="text-base font-mono mb-4" style={{ color: "var(--blue)" }}>PAYWALL</p>
-        <h1 className="font-semibold mb-5" style={{ fontSize: "52px", letterSpacing: "-0.03em" }}>
-          Pay per request.
-        </h1>
-        <p className="text-xl" style={{ color: "var(--muted)" }}>
-          Deposit USDC once. Every API call costs{" "}
-          <span className="font-mono" style={{ color: "var(--text)" }}>
-            {price !== undefined ? formatUnits(price, 6) : "0.001"} USDC
-          </span>
-          . No subscriptions, no API keys.
-        </p>
-      </div>
-
-      {/* How to use — first */}
-      <div className="p-8 rounded mb-8" style={{ border: "1px solid var(--border)" }}>
-        <p className="text-base font-mono mb-6" style={{ color: "var(--muted)" }}>HOW TO USE</p>
-        <div className="space-y-4">
-          {HOW_TO_USE.map((s, i) => (
-            <div key={i} className="flex gap-5">
-              <span className="font-mono shrink-0 text-base" style={{ color: "var(--blue)", marginTop: "2px" }}>
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <span className="text-lg" style={{ color: "var(--muted)", lineHeight: 1.6 }}>{s}</span>
+      <main className="mx-auto max-w-7xl px-6 pb-24 pt-10 md:px-10 lg:px-12">
+        <Reveal className="flex min-h-[72vh] items-center justify-center">
+          <div className="max-w-4xl text-center">
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-[11px] uppercase tracking-[0.28em] text-[#ffd7c7] backdrop-blur-md">
+              <Sparkles className="h-3.5 w-3.5" /> Paywall · micro access
             </div>
-          ))}
-        </div>
-      </div>
 
-      {/* Stats */}
-      {isConnected && (
-        <div className="grid grid-cols-3 gap-5 mb-8">
-          <Stat label="BALANCE" value={balance !== undefined ? `${formatUnits(balance, 6)} USDC` : "—"} />
-          <Stat label="REQUESTS REMAINING" value={remaining !== undefined ? remaining.toString() : "—"} />
-          <Stat label="PRICE / REQUEST" value={price !== undefined ? `${formatUnits(price, 6)} USDC` : "—"} />
-        </div>
-      )}
+            <h1 className="mt-8 text-5xl font-semibold leading-[0.9] tracking-[-0.06em] text-white md:text-7xl lg:text-[86px]">
+              Turn access
+              <span className="block text-[#ffb38a]">into micropayments</span>
+              <span className="block text-white/85">with one deposit.</span>
+            </h1>
 
-      {/* Deposit form */}
-      <div className="p-8 rounded" style={{ border: "1px solid var(--border)" }}>
-        <p className="text-lg font-semibold mb-8">Deposit Credits</p>
-        <div className="space-y-6 max-w-lg">
-          <div>
-            <Label>AMOUNT (USDC)</Label>
-            <Input
-              type="number"
-              placeholder="1.00"
-              step="0.001"
-              value={depositAmt}
-              onChange={(e) => setDepositAmt(e.target.value)}
-            />
-            {depositAmt && price !== undefined && (
-              <p className="text-base font-mono mt-2" style={{ color: "var(--muted)" }}>
-                = {Math.floor(Number(depositAmt) / Number(formatUnits(price, 6)))} requests
-              </p>
-            )}
-          </div>
-          <button
-            onClick={handleDeposit}
-            disabled={!isConnected || busy || !depositAmt}
-            className="w-full py-4 text-lg font-semibold rounded transition-all disabled:opacity-40"
-            style={{ background: "var(--blue)", color: "#fff" }}
-          >
-            {busy ? "Processing…" : "Deposit →"}
-          </button>
-          {!isConnected && (
-            <p className="text-base text-center" style={{ color: "var(--muted)" }}>
-              Connect wallet to continue
+            <p className="mx-auto mt-8 max-w-2xl text-lg leading-8 text-white/68 md:text-[21px]">
+              Deposit once, consume request credits over time, and pay only for actual usage instead of bloated subscriptions.
             </p>
-          )}
+          </div>
+        </Reveal>
+
+        <div className="grid gap-6">
+          <Reveal>
+            <GlassCard className="overflow-hidden">
+              <div className="border-b border-white/10 p-7 md:p-8">
+                <p className="text-sm uppercase tracking-[0.24em] text-white/50">Deposit credits</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">Fund your request balance</h2>
+              </div>
+
+              <div className="space-y-6 p-7 md:p-8">
+                {isConnected && (
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <Stat
+                      label="Balance"
+                      value={balance !== undefined ? `${formatUnits(balance, 6)} USDC` : "—"}
+                      icon={<Wallet className="h-4 w-4" />}
+                    />
+                    <Stat
+                      label="Requests remaining"
+                      value={remaining !== undefined ? remaining.toString() : "—"}
+                      icon={<Gauge className="h-4 w-4" />}
+                    />
+                    <Stat
+                      label="Price / request"
+                      value={price !== undefined ? `${formatUnits(price, 6)} USDC` : "—"}
+                      icon={<Coins className="h-4 w-4" />}
+                    />
+                  </div>
+                )}
+
+                <div className="max-w-xl">
+                  <Label>Amount (USDC)</Label>
+                  <Input
+                    type="number"
+                    placeholder="1.00"
+                    step="0.001"
+                    value={depositAmt}
+                    onChange={(e) => setDepositAmt(e.target.value)}
+                  />
+                  {requestEstimate !== null && (
+                    <p className="mt-2 text-sm text-white/45">≈ {requestEstimate} requests</p>
+                  )}
+                </div>
+
+                <button
+                  onClick={handleDeposit}
+                  disabled={!isConnected || busy || !depositAmt}
+                  className="inline-flex w-full max-w-xl items-center justify-center gap-2 rounded-full bg-[#fff4ec] px-6 py-4 text-sm font-semibold text-[#291c28] transition disabled:opacity-40"
+                >
+                  {busy ? "Processing..." : "Deposit credits"}
+                  <ArrowUpRight className="h-4 w-4" />
+                </button>
+
+                {!isConnected && <p className="text-sm text-white/45">Connect wallet to continue.</p>}
+              </div>
+            </GlassCard>
+          </Reveal>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
