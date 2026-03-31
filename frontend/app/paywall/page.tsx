@@ -114,6 +114,7 @@ export default function PaywallPage() {
 
   const [depositAmt, setDepositAmt] = useState("");
   const [withdrawAmt, setWithdrawAmt] = useState("");
+  const [prompt, setPrompt] = useState("");
   const [apiResult, setApiResult] = useState<null | { success?: boolean; response?: { message: string; model: string; timestamp: string }; creditsUsed?: number; creditsRemaining?: string; error?: string }>(null);
   const [apiLoading, setApiLoading] = useState(false);
 
@@ -154,14 +155,14 @@ export default function PaywallPage() {
   }
 
   async function handleTryRequest() {
-    if (!address) return;
+    if (!address || !prompt.trim()) return;
     setApiLoading(true);
     setApiResult(null);
     try {
       const res = await fetch("/api/try-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address }),
+        body: JSON.stringify({ address, prompt: prompt.trim() }),
       });
       const data = await res.json();
       setApiResult(data);
@@ -358,34 +359,57 @@ export default function PaywallPage() {
 
             <div className="p-7 md:p-8">
               <p className="max-w-xl text-sm leading-7 text-white/60">
-                Send a real request to the ArcFlow demo API. Each call checks your on-chain credit balance.
-                If you have credits, the request goes through.
+                Make a request and pay per call using your on-chain balance. Each request deducts one credit automatically.
               </p>
 
-              <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-start">
+              <div className="mt-6 space-y-3 max-w-xl">
+                <textarea
+                  rows={3}
+                  placeholder="Ask something..."
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleTryRequest();
+                    }
+                  }}
+                  className="w-full rounded-2xl border border-white/12 bg-black/20 px-4 py-3.5 text-white outline-none transition focus:border-white/30 resize-none text-sm leading-7"
+                />
                 <button
                   onClick={handleTryRequest}
-                  disabled={!isConnected || apiLoading}
+                  disabled={!isConnected || apiLoading || !prompt.trim()}
                   className="inline-flex items-center justify-center gap-2 rounded-full bg-[#fff4ec] px-6 py-4 text-sm font-semibold text-[#291c28] transition disabled:opacity-40"
                 >
-                  {apiLoading ? "Sending request..." : "Try request"}
+                  {apiLoading ? "Sending request..." : "Send request"}
                   <ArrowUpRight className="h-4 w-4" />
                 </button>
-                {!isConnected && <p className="text-sm text-white/45 self-center">Connect wallet to continue.</p>}
+                {!isConnected && <p className="text-sm text-white/45">Connect wallet to continue.</p>}
               </div>
 
               {apiResult && (
-                <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-5 font-mono text-sm">
+                <div className="mt-6 max-w-xl space-y-4">
                   {apiResult.error ? (
-                    <p className="text-red-400">{apiResult.error}</p>
-                  ) : (
-                    <div className="space-y-2 text-white/75">
-                      <p><span className="text-white/40">Response:</span> {apiResult.response?.message}</p>
-                      <p><span className="text-white/40">Model:</span> {apiResult.response?.model}</p>
-                      <p><span className="text-white/40">Credits used:</span> {apiResult.creditsUsed}</p>
-                      <p><span className="text-white/40">Credits remaining:</span> {apiResult.creditsRemaining}</p>
-                      <p><span className="text-white/40">Timestamp:</span> {apiResult.response?.timestamp}</p>
+                    <div className="rounded-2xl border border-red-400/20 bg-red-400/8 p-5 text-sm text-red-300">
+                      {apiResult.error}
                     </div>
+                  ) : (
+                    <>
+                      <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                        <p className="text-xs uppercase tracking-[0.22em] text-white/40 mb-3">Response</p>
+                        <p className="text-base leading-7 text-white">{apiResult.response?.message}</p>
+                      </div>
+                      <div className="flex gap-3">
+                        <div className="flex-1 rounded-2xl border border-white/10 bg-black/20 p-4 text-center">
+                          <div className="text-xs uppercase tracking-[0.2em] text-white/40 mb-2">Credits used</div>
+                          <div className="text-xl font-semibold text-white">{apiResult.creditsUsed}</div>
+                        </div>
+                        <div className="flex-1 rounded-2xl border border-white/10 bg-black/20 p-4 text-center">
+                          <div className="text-xs uppercase tracking-[0.2em] text-white/40 mb-2">Credits remaining</div>
+                          <div className="text-xl font-semibold text-white">{apiResult.creditsRemaining}</div>
+                        </div>
+                      </div>
+                    </>
                   )}
                 </div>
               )}

@@ -22,8 +22,29 @@ const ABI = [
   },
 ] as const;
 
+const DEMO_RESPONSES: Record<string, string> = {
+  default: "ArcFlow enables usage-based payments onchain.",
+  stream: "Streaming payments on ArcFlow accrue every second. Recipients can withdraw anytime without waiting for a payment cycle.",
+  invoice: "ArcFlow invoices are settled on-chain. Create one, share the ID, and the payer sends USDC directly to you.",
+  paywall: "The paywall model lets you deposit USDC upfront and consume credits per API call — no subscription, no overpaying.",
+  usdc: "ArcFlow uses native USDC on Arc Testnet. Sub-cent transactions make micropayments viable for the first time.",
+  arc: "Arc is a high-throughput EVM chain with native USDC support. ArcFlow is built natively on Arc to make payments instant and cheap.",
+  how: "ArcFlow has three payment primitives: Stream (continuous), Invoice (one-time), and Paywall (per-request). Each maps to a real-world payment need.",
+};
+
+function getDemoResponse(prompt: string): string {
+  const lower = prompt.toLowerCase();
+  if (lower.includes("stream") || lower.includes("salary") || lower.includes("continu")) return DEMO_RESPONSES.stream;
+  if (lower.includes("invoice") || lower.includes("bill") || lower.includes("pay ")) return DEMO_RESPONSES.invoice;
+  if (lower.includes("paywall") || lower.includes("credit") || lower.includes("api")) return DEMO_RESPONSES.paywall;
+  if (lower.includes("usdc") || lower.includes("token") || lower.includes("stablecoin")) return DEMO_RESPONSES.usdc;
+  if (lower.includes("arc") || lower.includes("chain") || lower.includes("network")) return DEMO_RESPONSES.arc;
+  if (lower.includes("how") || lower.includes("work") || lower.includes("what")) return DEMO_RESPONSES.how;
+  return DEMO_RESPONSES.default;
+}
+
 export async function POST(req: Request) {
-  const { address } = await req.json();
+  const { address, prompt } = await req.json();
 
   if (!address) {
     return Response.json({ error: "Wallet address required." }, { status: 400 });
@@ -51,7 +72,7 @@ export async function POST(req: Request) {
   return Response.json({
     success: true,
     response: {
-      message: "Access granted.",
+      message: getDemoResponse(prompt ?? ""),
       model: "arcflow-demo-v1",
       timestamp: new Date().toISOString(),
     },
