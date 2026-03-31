@@ -20,7 +20,7 @@ ArcFlow is the payment layer for Arc Testnet. Think Stripe, but on-chain — no 
 
 ## Built on Arc
 
-ArcFlow isn't just deployed on Arc — it's designed around what Arc uniquely makes possible.
+ArcFlow is deployed on Arc and it's designed around what Arc uniquely makes possible.
 
 ### Native USDC as Gas
 
