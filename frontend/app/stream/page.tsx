@@ -147,6 +147,7 @@ export default function StreamPage() {
   const [deposit, setDeposit] = useState("");
   const [streamId, setStreamId] = useState<bigint | null>(null);
   const [lookupId, setLookupId] = useState("");
+  const [confirmedLookupId, setConfirmedLookupId] = useState("");
   const [tick, setTick] = useState(0);
 
   // Tick every second for live withdrawable display
@@ -164,7 +165,7 @@ export default function StreamPage() {
   });
 
   // Active stream ID (from creation or manual lookup)
-  const activeId = streamId ?? (lookupId ? BigInt(lookupId) : null);
+  const activeId = streamId ?? (confirmedLookupId ? BigInt(confirmedLookupId) : null);
 
   const { data: streamData } = useReadContract({
     address: CONTRACTS.arcFlow,
@@ -376,8 +377,24 @@ export default function StreamPage() {
                     type="number"
                     placeholder="Stream ID (e.g. 1)"
                     value={lookupId}
-                    onChange={(e) => { setLookupId(e.target.value); setStreamId(null); }}
+                    onChange={(e) => setLookupId(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && lookupId) {
+                        setStreamId(null);
+                        setConfirmedLookupId(lookupId);
+                      }
+                    }}
                   />
+                  <button
+                    onClick={() => {
+                      if (!lookupId) return;
+                      setStreamId(null);
+                      setConfirmedLookupId(lookupId);
+                    }}
+                    className="rounded-2xl border border-white/12 bg-white/8 px-5 py-3 text-sm font-medium text-white transition hover:bg-white/12 whitespace-nowrap"
+                  >
+                    Check
+                  </button>
                 </div>
 
                 {!activeId && (
