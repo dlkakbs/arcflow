@@ -40,16 +40,17 @@ const ABI = [
     outputs: [{ name: "", type: "uint256" }],
   },
   {
-    name: "getStream",
+    name: "streams",
     type: "function",
     stateMutability: "view",
     inputs: [{ name: "id", type: "uint256" }],
     outputs: [
-      { name: "sender", type: "address" },
+      { name: "payer", type: "address" },
       { name: "recipient", type: "address" },
       { name: "rate", type: "uint256" },
-      { name: "deposit", type: "uint256" },
       { name: "startTime", type: "uint256" },
+      { name: "deposit", type: "uint256" },
+      { name: "withdrawn", type: "uint256" },
       { name: "active", type: "bool" },
     ],
   },
@@ -61,11 +62,18 @@ const ABI = [
     outputs: [{ name: "", type: "uint256" }],
   },
   {
+    name: "remainingTime",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "id", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
     name: "StreamCreated",
     type: "event",
     inputs: [
       { name: "id", type: "uint256", indexed: true },
-      { name: "sender", type: "address", indexed: true },
+      { name: "payer", type: "address", indexed: true },
       { name: "recipient", type: "address", indexed: true },
       { name: "rate", type: "uint256", indexed: false },
       { name: "deposit", type: "uint256", indexed: false },
@@ -161,7 +169,7 @@ export default function StreamPage() {
   const { data: streamData } = useReadContract({
     address: CONTRACTS.arcFlow,
     abi: ABI,
-    functionName: "getStream",
+    functionName: "streams",
     args: activeId !== null ? [activeId] : undefined,
     query: { enabled: activeId !== null, refetchInterval: 10000 },
   });
@@ -172,6 +180,14 @@ export default function StreamPage() {
     functionName: "withdrawable",
     args: activeId !== null ? [activeId] : undefined,
     query: { enabled: activeId !== null, refetchInterval: 5000 },
+  });
+
+  const { data: remainingTimeSec } = useReadContract({
+    address: CONTRACTS.arcFlow,
+    abi: ABI,
+    functionName: "remainingTime",
+    args: activeId !== null ? [activeId] : undefined,
+    query: { enabled: activeId !== null, refetchInterval: 10000 },
   });
 
   // Extract stream ID from receipt logs after creation
@@ -188,16 +204,14 @@ export default function StreamPage() {
     }
   }, [receipt]);
 
-  // Client-side accrual estimate between refetches
+  // Client-side accrual between refetches — adds rate*tick for smooth display
   const withdrawableDisplay = useMemo(() => {
-    if (withdrawableRaw === undefined || !streamData) return null;
-    const streamArr = streamData as readonly [string, string, bigint, bigint, bigint, boolean];
+    if (withdrawableRaw === undefined || !streamArr) return null;
     const ratePerSec = streamArr[2];
-    // Add ~1s of accrual per tick for smooth display
     const extra = ratePerSec * BigInt(tick % 5);
     const total = withdrawableRaw + extra;
     return formatUnits(total, 6);
-  }, [withdrawableRaw, streamData, tick]);
+  }, [withdrawableRaw, streamArr, tick]);
 
   function handleCreate() {
     if (!recipient || !monthly || !deposit) return;
@@ -218,10 +232,11 @@ export default function StreamPage() {
     return Math.floor((Number(deposit) / Number(monthly)) * 30);
   }, [deposit, monthly]);
 
-  const streamArr = streamData as readonly [string, string, bigint, bigint, bigint, boolean] | undefined;
-  const streamMonthly = streamArr ? Number(formatUnits(streamArr[2], 6)) * 60 * 60 * 24 * 30 : null;
-  const streamRunway = streamArr
-    ? Math.floor(Number(formatUnits(streamArr[3], 6)) / (Number(formatUnits(streamArr[2], 6)) * 60 * 60 * 24 * 30) * 30)
+  // payer[0], recipient[1], rate[2], startTime[3], deposit[4], withdrawn[5], active[6]
+  const streamArr = streamData as readonly [string, string, bigint, bigint, bigint, bigint, boolean] | undefined;
+  const streamMonthly = streamArr ? Number(formatUnits(streamArr[2], 6)) * 2_592_000 : null;
+  const streamRunwayDays = remainingTimeSec !== undefined
+    ? Math.floor(Number(remainingTimeSec) / 86400)
     : null;
 
   return (
@@ -331,7 +346,7 @@ export default function StreamPage() {
                       <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Check any stream by ID</h2>
                     </div>
                   </div>
-                  {streamArr?.[5] && (
+                  {streamArr?.[6] && (
                     <div className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                       Live
@@ -380,7 +395,7 @@ export default function StreamPage() {
                     <div className="rounded-[1.6rem] border border-white/10 bg-black/20 p-6">
                       <p className="text-xs uppercase tracking-[0.22em] text-white/45">Runway</p>
                       <div className="mt-4 text-2xl font-semibold tracking-[-0.04em] text-white">
-                        {streamRunway !== null ? `${streamRunway} days` : "—"}
+                        {streamRunwayDays !== null ? `${streamRunwayDays} days` : "—"}
                       </div>
                       <div className="mt-1 text-sm text-white/50">remaining</div>
                     </div>
@@ -388,7 +403,7 @@ export default function StreamPage() {
                     <div className="rounded-[1.6rem] border border-white/10 bg-black/20 p-6">
                       <p className="text-xs uppercase tracking-[0.22em] text-white/45">Recipient</p>
                       <div className="mt-4 text-lg font-semibold tracking-[-0.02em] text-white font-mono">
-                        {shortAddr(streamArr[1] as string)}
+                        {shortAddr(streamArr[1]as string)}
                       </div>
                       <div className="mt-1 text-sm text-white/50">receiving address</div>
                     </div>
@@ -396,7 +411,7 @@ export default function StreamPage() {
                     <div className="rounded-[1.6rem] border border-white/10 bg-black/20 p-6">
                       <p className="text-xs uppercase tracking-[0.22em] text-white/45">Started</p>
                       <div className="mt-4 text-lg font-semibold tracking-[-0.02em] text-white">
-                        {timeAgo(streamArr[4] as bigint)}
+                        {timeAgo(streamArr[3] as bigint)}
                       </div>
                       <div className="mt-1 text-sm text-white/50">stream age</div>
                     </div>
