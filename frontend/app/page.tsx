@@ -259,7 +259,7 @@ export default function HomePage() {
                 [Sparkles, "No fragmentation", "Everything runs in one place."],
                 [Orbit, "No intermediaries", "Payments settle directly onchain."],
                 [Wallet, "No rigid models", "Time, event, or usage — choose what fits."],
-                [Waves, "Built for builders", "Designed for APIs, apps, and real workflows."],
+                [Waves, "No extra complexity", "Runs natively on Arc."],
               ].map(([Icon, title, desc]) => {
                 const Cmp = Icon as React.ElementType;
                 return (

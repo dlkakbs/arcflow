@@ -89,14 +89,17 @@ Generate a USDC invoice and share the numeric ID with your client. The client pa
 
 ### Paywall
 
-Deposit USDC credits once. Each API request is signed off-chain (no gas) and queued. The owner batches up to 50 signatures into a single `redeemBatch` transaction, amortizing gas across all requests. The frontend includes a live demo so you can see the signing flow and credits deducted in real time.
+Deposit USDC credits once. Each API request is signed off-chain (no gas) and queued. The contract deployer (owner) batches up to 50 signatures into a single `redeemBatch` transaction — payments flow from the contract to the owner only at that point, not per request.
+
+The frontend includes a live demo so you can see the signing flow and credits deducted in real time.
 
 **Security model:**
 - **Domain separation:** every signature commits to `address(this)` + `chainId`, preventing replay across contracts or chains
 - **Monotonic nonce:** signatures are strictly ordered per user, preventing replay within the same contract
 - **Deadline:** each signature expires after 10 minutes, eliminating stale pending payments
 - **Max deposit cap:** limits custody exposure per user
-- **Escape path:** if the owner is inactive for 7 days, users can emergency-withdraw their full deposit
+- **Normal withdraw:** users can withdraw their unused deposit at any time, no conditions
+- **Escape path:** if the owner is inactive for 7 days, users can emergency-withdraw their full deposit directly from the contract — even if the frontend is down
 
 ---
 
