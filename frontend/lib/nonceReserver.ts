@@ -79,7 +79,7 @@ export async function markSubmitted(reservationId: string): Promise<Reservation 
   return updated
 }
 
-// Queue'ya ekle (score = nonce, sıralı)
+// Queue'ya ekle (score = nonce, sıralı) + active clients set'e kaydet
 export async function enqueueItem(
   clientAddress: string,
   nonce: number,
@@ -89,6 +89,19 @@ export async function enqueueItem(
   const redis = getRedis()
   const addr = clientAddress.toLowerCase()
   await redis.zadd(`queue:${addr}`, { score: nonce, member: JSON.stringify({ nonce, deadline, signature }) })
+  await redis.sadd('active-clients', addr)
+}
+
+// Settle edilecek tüm aktif client'ları getir
+export async function getActiveClients(): Promise<string[]> {
+  const redis = getRedis()
+  return (await redis.smembers('active-clients')) as string[]
+}
+
+// Client'ı active listesinden çıkar (queue boşaldığında)
+export async function removeActiveClient(clientAddress: string): Promise<void> {
+  const redis = getRedis()
+  await redis.srem('active-clients', clientAddress.toLowerCase())
 }
 
 // Nonce sırasına göre queue item'larını getir

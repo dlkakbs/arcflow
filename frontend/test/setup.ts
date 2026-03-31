@@ -106,6 +106,26 @@ class InMemoryRedis {
     return this.sortedSets.get(key)?.size ?? 0
   }
 
+  async sadd(key: string, ...members: string[]): Promise<number> {
+    if (!this.sortedSets.has(key)) this.sortedSets.set(key, new Map())
+    const set = this.sortedSets.get(key)!
+    let added = 0
+    for (const m of members) { if (!set.has(m)) { set.set(m, 0); added++ } }
+    return added
+  }
+
+  async srem(key: string, ...members: string[]): Promise<number> {
+    const set = this.sortedSets.get(key)
+    if (!set) return 0
+    let removed = 0
+    for (const m of members) { if (set.delete(m)) removed++ }
+    return removed
+  }
+
+  async smembers(key: string): Promise<string[]> {
+    return [...(this.sortedSets.get(key)?.keys() ?? [])]
+  }
+
   async flushall(): Promise<void> {
     this.store.clear()
     this.sortedSets.clear()
