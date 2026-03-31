@@ -8,7 +8,7 @@ Live demo: [flowonarc.vercel.app](https://flowonarc.vercel.app)
 
 ## What is ArcFlow?
 
-ArcFlow is the payment layer for Arc Testnet. Think Stripe, but on-chain — no intermediaries, no chargebacks, instant settlement in native USDC. It ships three composable payment primitives:
+ArcFlow is the payment layer for Arc Testnet. Think Stripe, but on-chain — no intermediaries, no chargebacks, settlement in native USDC. It ships three composable payment primitives:
 
 | Module | What it does |
 |--------|-------------|
@@ -20,7 +20,7 @@ ArcFlow is the payment layer for Arc Testnet. Think Stripe, but on-chain — no 
 
 ## Built on Arc
 
-ArcFlow is deployed on Arc and it's designed around what Arc uniquely makes possible.
+ArcFlow is built around what Arc uniquely makes possible.
 
 ### Native USDC as Gas
 
@@ -29,7 +29,6 @@ Arc makes USDC the native gas token of the network. Every transaction fee is pai
 For ArcFlow this means:
 - Users deposit USDC and consume credits — no separate gas wallet required
 - Per-request costs are predictable in dollar terms, not subject to gas market swings
-- Enterprises can budget API access like a SaaS subscription: a fixed dollar amount, expensed like any operating cost
 
 Arc achieves this through a dual USDC interface: as the native gas token it uses 18 decimals internally for metering; as an ERC-20 it uses the standard 6 decimals. A precompiled contract synchronizes both representations automatically. ArcFlow uses the 6-decimal ERC-20 interface consistently throughout.
 
@@ -45,19 +44,15 @@ ArcFlow's batch settlement pattern is built around this: clients sign each reque
 
 Arc uses Malachite — a high-performance BFT consensus protocol based on Tendermint. Once 2/3 of validators commit a block, the transaction is immediately and irreversibly final. There is no probabilistic finality, no reorg risk, no "wait 12 confirmations."
 
-This matters for payment infrastructure: a stream withdrawal, invoice payment, or paywall deposit is settled the moment it lands in a block. ArcFlow's frontend can show confirmed state without artificial delays or optimistic assumptions.
-
-Malachite's design also delivers exceptional throughput: ~10,000 TPS with <100ms finality on commodity hardware with 4 validators, with planned enhancements targeting another 10x increase. ArcFlow is ready to scale with the network.
+This matters for payment infrastructure: a stream withdrawal or invoice payment is settled the moment it lands in a block. ArcFlow's frontend can show confirmed state without artificial delays.
 
 ### Circle Ecosystem Integration
 
-Arc is built by Circle and is natively integrated into Circle's full-stack platform: USDC issuance, CCTP (Cross-Chain Transfer Protocol), Circle Gateway, and institutional on/off-ramps. Arc's USDC is the canonical version — not a bridge wrapper or a synthetic.
-
-ArcFlow inherits this: the USDC flowing through Stream, Invoice, and Paywall is the same USDC that settles across Circle's institutional network, trusted by Visa, HSBC, BlackRock, and Fireblocks. When ArcFlow processes a payment, it settles in the same asset that institutional treasuries hold.
+Arc is built by Circle and is natively integrated into Circle's USDC issuance infrastructure. Arc's USDC is the canonical version — not a bridge wrapper or a synthetic. ArcFlow's payment primitives operate on top of this foundation.
 
 ### EVM Compatibility
 
-Arc is fully EVM-compatible. ArcFlow's contracts are standard Solidity, built with Foundry, and verifiable on [ArcScan](https://testnet.arcscan.app) — the same toolchain any Ethereum developer already knows. No new languages, no new paradigms, no migration cost.
+Arc is fully EVM-compatible. ArcFlow's contracts are standard Solidity, built with Foundry, and verifiable on [ArcScan](https://testnet.arcscan.app). Any Ethereum developer can read, fork, or extend them without learning new tooling.
 
 ---
 
@@ -89,7 +84,7 @@ Generate a USDC invoice and share the numeric ID with your client. The client pa
 
 ### Paywall
 
-Deposit USDC credits once. Each API request is signed off-chain (no gas) and queued. The contract deployer (owner) batches up to 50 signatures into a single `redeemBatch` transaction — payments flow from the contract to the owner only at that point, not per request.
+Deposit USDC credits once. Each API request is signed off-chain (no gas) and queued. The contract deployer (owner) batches up to 50 signatures into a single `redeemBatch` transaction — payments flow from the contract to the owner only at that point, not per request. Unsettled queues are swept hourly by a cron job.
 
 The frontend includes a live demo so you can see the signing flow and credits deducted in real time.
 
@@ -117,6 +112,7 @@ The frontend includes a live demo so you can see the signing flow and credits de
 **Backend**
 - Next.js API Routes (serverless)
 - Upstash Redis — atomic nonce reservation, idempotency keys, ordered settlement queue
+- Vercel Cron — hourly batch settlement sweep
 
 ---
 
@@ -155,6 +151,7 @@ Create a `.env.local`:
 UPSTASH_REDIS_REST_URL=https://your-db.upstash.io
 UPSTASH_REDIS_REST_TOKEN=your-token
 OWNER_PRIVATE_KEY=0x...
+CRON_SECRET=your-random-secret
 ```
 
 ### Tests
