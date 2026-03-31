@@ -268,7 +268,7 @@ export default function HomePage() {
                     className="rounded-[1.6rem] border border-white/12 bg-black/20 p-6 backdrop-blur-xl flex flex-col"
                   >
                     <Cmp className="h-5 w-5 text-[#ffd7c7]" />
-                    <div className="mt-5 text-lg font-semibold text-white">{title}</div>
+                    <div className="mt-5 text-lg font-semibold text-white">{title as string}</div>
                     <div className="mt-2 text-sm leading-6 text-white/62 whitespace-pre-line">{desc as string}</div>
                   </div>
                 );
