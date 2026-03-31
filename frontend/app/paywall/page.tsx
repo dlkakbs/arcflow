@@ -2,9 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
-import { formatUnits, parseUnits } from "viem";
+import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract, useSignMessage } from "wagmi";
+import { formatUnits, parseUnits, keccak256, encodePacked, toBytes } from "viem";
 import { CONTRACTS } from "@/lib/wagmi";
+import { PAYWALL_ADDRESS } from "@/lib/arcChain";
+
+const ARC_CHAIN_ID = 5042002;
 import { ArrowUpRight, Sparkles, Wallet, Gauge, Coins, Zap } from "lucide-react";
 
 const ABI = [
@@ -108,6 +111,7 @@ export default function PaywallPage() {
 
   const { writeContract: writeDeposit, data: depositHash, isPending: isDepositPending } = useWriteContract();
   const { writeContract: writeWithdraw, data: withdrawHash, isPending: isWithdrawPending } = useWriteContract();
+  const { signMessageAsync } = useSignMessage();
 
   const { isLoading: isDepositMining, isSuccess: isDepositSuccess } = useWaitForTransactionReceipt({ hash: depositHash });
   const { isLoading: isWithdrawMining, isSuccess: isWithdrawSuccess } = useWaitForTransactionReceipt({ hash: withdrawHash });
@@ -159,15 +163,51 @@ export default function PaywallPage() {
     setApiLoading(true);
     setApiResult(null);
     try {
-      const res = await fetch("/api/try-request", {
+      // 1. Nonce rezerve et — server authoritative pricePerRequest döner
+      const nonceRes = await fetch("/api/get-nonce", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address, prompt: prompt.trim() }),
+        body: JSON.stringify({ clientAddress: address }),
       });
-      const data = await res.json();
+      const { nonce, reservationId, deadline, pricePerRequest, error: nonceErr } = await nonceRes.json();
+      if (nonceErr) { setApiResult({ error: nonceErr }); return; }
+
+      // 2. Hash oluştur (contract ile aynı encoding)
+      const msgHash = keccak256(
+        encodePacked(
+          ["address", "uint256", "address", "uint256", "uint256", "uint256"],
+          [
+            PAYWALL_ADDRESS,
+            BigInt(ARC_CHAIN_ID),
+            address,
+            BigInt(nonce),
+            BigInt(deadline),
+            BigInt(pricePerRequest),
+          ]
+        )
+      );
+
+      // 3. Off-chain imzala — gas yok, zincire gitmez
+      const signature = await signMessageAsync({ message: { raw: toBytes(msgHash) } });
+
+      // 4. API'ye gönder — imza queue'ya eklenir, response anında döner
+      const idempotencyKey = crypto.randomUUID();
+      const reqRes = await fetch("/api/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reservationId,
+          idempotencyKey,
+          signature,
+          prompt: prompt.trim(),
+          clientAddress: address,
+        }),
+      });
+      const data = await reqRes.json();
       setApiResult(data);
-    } catch {
-      setApiResult({ error: "Request failed. Try again." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Request failed. Try again.";
+      setApiResult({ error: msg });
     } finally {
       setApiLoading(false);
     }

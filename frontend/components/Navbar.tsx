@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { injected } from "wagmi/connectors";
+import { useEffect, useState } from "react";
 
 const NAV = [
   { href: "/stream", label: "Stream" },
@@ -20,6 +21,8 @@ export function Navbar() {
   const { address, isConnected } = useAccount();
   const { connect } = useConnect();
   const { disconnect } = useDisconnect();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   return (
     <nav className="sticky top-0 z-50 px-4 pt-4 md:px-8 lg:px-10">
@@ -53,7 +56,7 @@ export function Navbar() {
           })}
         </div>
 
-        {isConnected ? (
+        {mounted && isConnected ? (
           <button
             onClick={() => disconnect()}
             className="inline-flex items-center gap-2 rounded-full border border-white/14 bg-black/20 px-4 py-2 text-sm font-medium text-white/85 transition hover:bg-white/10"
