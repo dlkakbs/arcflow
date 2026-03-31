@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { formatUnits, parseUnits } from "viem";
 import { CONTRACTS } from "@/lib/wagmi";
-import { ArrowUpRight, Sparkles, Wallet, Gauge, Coins } from "lucide-react";
+import { ArrowUpRight, Sparkles, Wallet, Gauge, Coins, Zap } from "lucide-react";
 
 const ABI = [
   {
@@ -114,6 +114,8 @@ export default function PaywallPage() {
 
   const [depositAmt, setDepositAmt] = useState("");
   const [withdrawAmt, setWithdrawAmt] = useState("");
+  const [apiResult, setApiResult] = useState<null | { success?: boolean; response?: { message: string; model: string; timestamp: string }; creditsUsed?: number; creditsRemaining?: string; error?: string }>(null);
+  const [apiLoading, setApiLoading] = useState(false);
 
   const { data: balance } = useReadContract({
     address: CONTRACTS.arcPaywall,
@@ -149,6 +151,25 @@ export default function PaywallPage() {
       functionName: "deposit",
       value: parseUnits(depositAmt, 6),
     });
+  }
+
+  async function handleTryRequest() {
+    if (!address) return;
+    setApiLoading(true);
+    setApiResult(null);
+    try {
+      const res = await fetch("/api/try-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address }),
+      });
+      const data = await res.json();
+      setApiResult(data);
+    } catch {
+      setApiResult({ error: "Request failed. Try again." });
+    } finally {
+      setApiLoading(false);
+    }
   }
 
   function handleWithdraw() {
@@ -321,6 +342,56 @@ export default function PaywallPage() {
             </GlassCard>
           </Reveal>
         </div>
+        <Reveal>
+          <GlassCard className="mt-6 overflow-hidden">
+            <div className="border-b border-white/10 p-7 md:p-8">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl border border-white/12 bg-black/20 p-3">
+                  <Zap className="h-5 w-5 text-[#ffb38a]" />
+                </div>
+                <div>
+                  <p className="text-sm uppercase tracking-[0.24em] text-white/50">Live demo</p>
+                  <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Try a paid API request</h2>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-7 md:p-8">
+              <p className="max-w-xl text-sm leading-7 text-white/60">
+                Send a real request to the ArcFlow demo API. Each call checks your on-chain credit balance.
+                If you have credits, the request goes through.
+              </p>
+
+              <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-start">
+                <button
+                  onClick={handleTryRequest}
+                  disabled={!isConnected || apiLoading}
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-[#fff4ec] px-6 py-4 text-sm font-semibold text-[#291c28] transition disabled:opacity-40"
+                >
+                  {apiLoading ? "Sending request..." : "Try request"}
+                  <ArrowUpRight className="h-4 w-4" />
+                </button>
+                {!isConnected && <p className="text-sm text-white/45 self-center">Connect wallet to continue.</p>}
+              </div>
+
+              {apiResult && (
+                <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-5 font-mono text-sm">
+                  {apiResult.error ? (
+                    <p className="text-red-400">{apiResult.error}</p>
+                  ) : (
+                    <div className="space-y-2 text-white/75">
+                      <p><span className="text-white/40">Response:</span> {apiResult.response?.message}</p>
+                      <p><span className="text-white/40">Model:</span> {apiResult.response?.model}</p>
+                      <p><span className="text-white/40">Credits used:</span> {apiResult.creditsUsed}</p>
+                      <p><span className="text-white/40">Credits remaining:</span> {apiResult.creditsRemaining}</p>
+                      <p><span className="text-white/40">Timestamp:</span> {apiResult.response?.timestamp}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </GlassCard>
+        </Reveal>
       </main>
     </div>
   );
