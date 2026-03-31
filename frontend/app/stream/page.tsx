@@ -274,6 +274,9 @@ export default function StreamPage() {
     }
   }, [receipt]);
 
+  // payer[0], recipient[1], rate[2], startTime[3], deposit[4], withdrawn[5], active[6]
+  const streamArr = streamData as readonly [string, string, bigint, bigint, bigint, bigint, boolean] | undefined;
+
   // Client-side accrual between refetches — adds rate*tick for smooth display
   const withdrawableDisplay = useMemo(() => {
     if (withdrawableRaw === undefined || !streamArr) return null;
@@ -302,8 +305,6 @@ export default function StreamPage() {
     return Math.floor((Number(deposit) / Number(monthly)) * 30);
   }, [deposit, monthly]);
 
-  // payer[0], recipient[1], rate[2], startTime[3], deposit[4], withdrawn[5], active[6]
-  const streamArr = streamData as readonly [string, string, bigint, bigint, bigint, bigint, boolean] | undefined;
   const streamMonthly = streamArr ? Number(formatUnits(streamArr[2], 6)) * 2_592_000 : null;
   const streamRunwayDays = remainingTimeSec !== undefined
     ? Math.floor(Number(remainingTimeSec) / 86400)
