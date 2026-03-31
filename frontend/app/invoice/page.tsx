@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useAccount, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
-import { parseUnits } from "viem";
+import { decodeEventLog, parseUnits } from "viem";
 import { CONTRACTS } from "@/lib/wagmi";
 import { ArrowUpRight, Sparkles } from "lucide-react";
 
@@ -25,6 +25,16 @@ const ABI = [
     stateMutability: "payable",
     inputs: [{ name: "id", type: "uint256" }],
     outputs: [],
+  },
+  {
+    name: "InvoiceCreated",
+    type: "event",
+    inputs: [
+      { name: "id", type: "uint256", indexed: true },
+      { name: "creator", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+      { name: "description", type: "string", indexed: false },
+    ],
   },
 ] as const;
 
@@ -76,8 +86,15 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
 
 export default function InvoicePage() {
   const { isConnected } = useAccount();
-  const { writeContract, data: hash, isPending } = useWriteContract();
-  const { isLoading: isMining, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  // Separate hooks for create and pay
+  const { writeContract: writeCreate, data: createHash, isPending: isCreatePending } = useWriteContract();
+  const { writeContract: writePay, data: payHash, isPending: isPayPending } = useWriteContract();
+
+  const { isLoading: isCreateMining, isSuccess: isCreateSuccess, data: createReceipt } =
+    useWaitForTransactionReceipt({ hash: createHash });
+  const { isLoading: isPayMining, isSuccess: isPaySuccess, data: payReceipt } =
+    useWaitForTransactionReceipt({ hash: payHash });
 
   const [amount, setAmount] = useState("");
   const [desc, setDesc] = useState("");
@@ -85,12 +102,27 @@ export default function InvoicePage() {
   const [payId, setPayId] = useState("");
   const [payAmount, setPayAmount] = useState("");
 
-  const busy = isPending || isMining;
+  const createBusy = isCreatePending || isCreateMining;
+  const payBusy = isPayPending || isPayMining;
+
+  // Extract invoice ID from receipt logs
+  const invoiceId = (() => {
+    if (!createReceipt) return null;
+    for (const log of createReceipt.logs) {
+      try {
+        const decoded = decodeEventLog({ abi: ABI, eventName: "InvoiceCreated", data: log.data, topics: log.topics });
+        return (decoded.args as { id: bigint }).id.toString();
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  })();
 
   function handleCreate() {
     if (!amount || !desc) return;
     const deadlineTs = deadline ? Math.floor(new Date(deadline).getTime() / 1000) : 0;
-    writeContract({
+    writeCreate({
       address: CONTRACTS.arcInvoice,
       abi: ABI,
       functionName: "createInvoice",
@@ -100,7 +132,7 @@ export default function InvoicePage() {
 
   function handlePay() {
     if (!payId || !payAmount) return;
-    writeContract({
+    writePay({
       address: CONTRACTS.arcInvoice,
       abi: ABI,
       functionName: "payInvoice",
@@ -164,21 +196,25 @@ export default function InvoicePage() {
 
                   <button
                     onClick={handleCreate}
-                    disabled={!isConnected || busy || !amount || !desc}
+                    disabled={!isConnected || createBusy || !amount || !desc}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#fff4ec] px-6 py-4 text-sm font-semibold text-[#291c28] transition disabled:opacity-40"
                   >
-                    {busy ? "Processing..." : "Create invoice"}
+                    {createBusy ? "Processing..." : "Create invoice"}
                     <ArrowUpRight className="h-4 w-4" />
                   </button>
 
-                  {isSuccess && hash && (
-                    <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7]">
-                      <p>Invoice created. Open the explorer to find your invoice ID.</p>
+                  {isCreateSuccess && createHash && (
+                    <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7] space-y-2">
+                      {invoiceId !== null ? (
+                        <p>Invoice created. Your invoice ID is <span className="font-bold text-white text-base">#{invoiceId}</span> — share this with the payer.</p>
+                      ) : (
+                        <p>Invoice created. Open the explorer to find your invoice ID.</p>
+                      )}
                       <a
-                        href={`https://testnet.arcscan.app/tx/${hash}`}
+                        href={`https://testnet.arcscan.app/tx/${createHash}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-2 inline-flex items-center gap-1.5 font-medium text-[#ffb38a] underline underline-offset-2"
+                        className="inline-flex items-center gap-1.5 font-medium text-[#ffb38a] underline underline-offset-2"
                       >
                         View transaction
                         <ArrowUpRight className="h-3.5 w-3.5" />
@@ -214,12 +250,27 @@ export default function InvoicePage() {
 
                   <button
                     onClick={handlePay}
-                    disabled={!isConnected || busy || !payId || !payAmount}
+                    disabled={!isConnected || payBusy || !payId || !payAmount}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/14 bg-white/8 px-6 py-4 text-sm font-semibold text-white transition disabled:opacity-40"
                   >
-                    {busy ? "Processing..." : "Pay invoice"}
+                    {payBusy ? "Processing..." : "Pay invoice"}
                     <ArrowUpRight className="h-4 w-4" />
                   </button>
+
+                  {isPaySuccess && payHash && (
+                    <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7] space-y-2">
+                      <p>Payment confirmed. Funds have been sent to the invoice creator.</p>
+                      <a
+                        href={`https://testnet.arcscan.app/tx/${payHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 font-medium text-[#ffb38a] underline underline-offset-2"
+                      >
+                        View transaction
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                      </a>
+                    </div>
+                  )}
                 </div>
               </GlassCard>
             </Reveal>
