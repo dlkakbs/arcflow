@@ -100,12 +100,6 @@ NEXT_PUBLIC_ARC_PAYWALL=0xb1f95F4d86C743cbe1797C931A9680dF5766633A
 
 ---
 
-## Why Arc?
-
-Arc's sub-cent transaction fees make micropayments economically viable for the first time. A `0.001 USDC/request` paywall is impossible on mainnet Ethereum — on Arc it's a first-class product. ArcFlow exists to make these patterns accessible to any developer building on Arc.
-
----
-
 ## License
 
 MIT
