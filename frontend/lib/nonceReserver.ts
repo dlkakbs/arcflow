@@ -1,4 +1,4 @@
-import Redis from 'ioredis'
+import { Redis } from '@upstash/redis'
 
 // Arc Testnet — USDC native, 6 decimal
 export const ARC_CHAIN_ID = 5042002
@@ -18,20 +18,18 @@ export interface Reservation {
 let _redis: Redis | null = null
 
 export function getRedis(): Redis {
-  if (!_redis) _redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379')
+  if (!_redis) {
+    _redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL!,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    })
+  }
   return _redis
 }
 
+// Test'te inject için
 export function setRedisClient(client: Redis) {
   _redis = client
-}
-
-// On-chain nonce okur — test'te mock edilir
-export async function getOnChainNonce(
-  clientAddress: string,
-  readContract: (addr: string) => Promise<number>
-): Promise<number> {
-  return readContract(clientAddress)
 }
 
 // Atomic nonce rezervasyonu
@@ -42,11 +40,10 @@ export async function reserveNonce(
   const redis = getRedis()
   const addr = clientAddress.toLowerCase()
 
-  // INCR atomik — iki eş zamanlı istek asla aynı değeri almaz
   const pendingOffset = await redis.incr(`pending:${addr}`)
   const onChainNonce = await readContract(addr)
 
-  const nonce = onChainNonce + pendingOffset - 1
+  const nonce = onChainNonce + (pendingOffset as number) - 1
   const reservationId = crypto.randomUUID()
 
   const reservation: Reservation = {
@@ -57,52 +54,32 @@ export async function reserveNonce(
     usedAt: null,
   }
 
-  await redis.setex(
-    `reservation:${reservationId}`,
-    RESERVATION_TTL,
-    JSON.stringify(reservation)
-  )
+  await redis.set(`reservation:${reservationId}`, JSON.stringify(reservation), { ex: RESERVATION_TTL })
 
   return { nonce, reservationId }
 }
 
-// Reservation'ı "submitted" olarak işaretle — SET XX ile race condition önlenir
+// Reservation'ı "submitted" olarak işaretle
 export async function markSubmitted(reservationId: string): Promise<Reservation | null> {
   const redis = getRedis()
   const key = `reservation:${reservationId}`
 
-  const raw = await redis.get(key)
-  if (!raw) return null // expired veya yok
+  const raw = await redis.get<string>(key)
+  if (!raw) return null
 
-  const reservation: Reservation = JSON.parse(raw)
-
-  if (reservation.state !== 'reserved') return null // zaten kullanılmış
+  const reservation: Reservation = typeof raw === 'string' ? JSON.parse(raw) : raw
+  if (reservation.state !== 'reserved') return null
 
   const updated: Reservation = { ...reservation, state: 'submitted', usedAt: Date.now() }
 
-  // SET XX: sadece key varsa yaz — TTL'yi korur
-  const ok = await redis.set(key, JSON.stringify(updated), 'KEEPTTL', 'XX')
-  if (!ok) return null // başka istek yarıştı
+  // XX: sadece key varsa yaz, keepttl: TTL'yi koru
+  const ok = await redis.set(key, JSON.stringify(updated), { xx: true, keepTtl: true })
+  if (!ok) return null
 
   return updated
 }
 
-// Bir adrese ait submitted queue item'larını nonce sırasıyla getir
-export async function getQueueItems(
-  clientAddress: string,
-  minNonce = 0,
-  maxNonce = Infinity
-): Promise<Array<{ nonce: number; deadline: number; signature: string }>> {
-  const redis = getRedis()
-  const addr = clientAddress.toLowerCase()
-
-  const max = maxNonce === Infinity ? '+inf' : String(maxNonce)
-  const raw = await redis.zrangebyscore(`queue:${addr}`, minNonce, max)
-
-  return raw.map(item => JSON.parse(item))
-}
-
-// Queue'ya ekle (zadd — score = nonce)
+// Queue'ya ekle (score = nonce, sıralı)
 export async function enqueueItem(
   clientAddress: string,
   nonce: number,
@@ -111,17 +88,31 @@ export async function enqueueItem(
 ): Promise<void> {
   const redis = getRedis()
   const addr = clientAddress.toLowerCase()
-  await redis.zadd(`queue:${addr}`, nonce, JSON.stringify({ nonce, deadline, signature }))
+  await redis.zadd(`queue:${addr}`, { score: nonce, member: JSON.stringify({ nonce, deadline, signature }) })
 }
 
-// Settle edilen nonce'ları queue'dan temizle
-export async function removeSettled(clientAddress: string, upToNonce: number): Promise<void> {
+// Nonce sırasına göre queue item'larını getir
+export async function getQueueItems(
+  clientAddress: string,
+  minNonce = 0,
+  maxNonce = Infinity
+): Promise<Array<{ nonce: number; deadline: number; signature: string }>> {
   const redis = getRedis()
   const addr = clientAddress.toLowerCase()
-  await redis.zremrangebyscore(`queue:${addr}`, 0, upToNonce)
+
+  const max: number | '+inf' = maxNonce === Infinity ? '+inf' : maxNonce
+  const raw = await redis.zrange(`queue:${addr}`, minNonce, max, { byScore: true })
+
+  return (raw as string[]).map(item => (typeof item === 'string' ? JSON.parse(item) : item))
 }
 
-// pending counter'ı on-chain ile senkronize et (settle sonrası)
+// Settle edilen item'ları sil
+export async function removeSettled(clientAddress: string, upToNonce: number): Promise<void> {
+  const redis = getRedis()
+  await redis.zremrangebyscore(`queue:${clientAddress.toLowerCase()}`, 0, upToNonce)
+}
+
+// pending counter'ı sıfırla (settle sonrası)
 export async function syncPendingCounter(clientAddress: string): Promise<void> {
   const redis = getRedis()
   await redis.del(`pending:${clientAddress.toLowerCase()}`)

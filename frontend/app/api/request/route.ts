@@ -38,8 +38,8 @@ export async function POST(req: NextRequest) {
   const redis = getRedis()
 
   // ── Idempotency: aynı key ile gelen tekrar istek → cache'den dön ──────
-  const cached = await redis.get(`idem:${idempotencyKey}`)
-  if (cached) return NextResponse.json(JSON.parse(cached))
+  const cached = await redis.get<string>(`idem:${idempotencyKey}`)
+  if (cached) return NextResponse.json(typeof cached === 'string' ? JSON.parse(cached) : cached)
 
   // ── Reservation yükle ve "submitted" olarak işaretle ─────────────────
   const reservation = await markSubmitted(reservationId)
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
   await enqueueItem(clientAddress, reservation.nonce, deadline, signature)
 
   // ── Batch threshold kontrolü → settle ─────────────────────────────────
-  const queueSize = await redis.zcard(`queue:${clientAddress.toLowerCase()}`)
+  const queueSize = await redis.zcard(`queue:${clientAddress.toLowerCase()}`) as number
   if (queueSize >= BATCH_SIZE && process.env.OWNER_PRIVATE_KEY) {
     triggerBatchSettle(clientAddress, pricePerRequest).catch(console.error)
   }

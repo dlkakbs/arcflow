@@ -1,25 +1,19 @@
-import RedisMock from 'ioredis-mock'
+import { testRedis } from './setup'
 import { setRedisClient } from '../lib/nonceReserver'
 
-// Her test için temiz Redis instance
 export function createTestRedis() {
-  const redis = new RedisMock()
-  setRedisClient(redis)
-  return redis
+  setRedisClient(testRedis as never)
+  return testRedis
 }
 
-export async function resetRedis(redis: InstanceType<typeof RedisMock>) {
+export async function resetRedis(redis: typeof testRedis) {
   await redis.flushall()
 }
 
-// On-chain nonce mock: address → nonce map
 export function makeReadContract(nonceMap: Record<string, number> = {}) {
-  return async (addr: string): Promise<number> => {
-    return nonceMap[addr.toLowerCase()] ?? 0
-  }
+  return async (addr: string): Promise<number> => nonceMap[addr.toLowerCase()] ?? 0
 }
 
-// writeContract mock: sadece tx hash döner, nonces kaydeder
 export function makeWriteContract(settled: number[][] = []) {
   return async (args: {
     clients: string[]
@@ -32,12 +26,10 @@ export function makeWriteContract(settled: number[][] = []) {
   }
 }
 
-// Gelecekte geçerli deadline (10 dakika)
 export function futureDeadline(): number {
   return Math.floor(Date.now() / 1000) + 600
 }
 
-// Geçmiş deadline (expired)
 export function pastDeadline(): number {
   return Math.floor(Date.now() / 1000) - 1
 }
