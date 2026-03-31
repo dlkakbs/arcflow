@@ -34,9 +34,9 @@ const MODULES = [
     href: "/paywall",
     title: "Paywall",
     subtitle: "Pay 0.001 USDC per API request",
-    what: "Deposit USDC upfront to unlock access to a service or API. A tiny amount gets deducted automatically per request.",
+    what: "Deposit USDC upfront to unlock access to a service or API. Sign each request off-chain — no gas. Payments settle in batches, keeping costs near zero.",
     useCases: [
-      "AI agent usage-based billing",
+      "API monetization — charge per call",
       "Data APIs paid by actual usage",
       "Micropayment-based digital access",
     ],
