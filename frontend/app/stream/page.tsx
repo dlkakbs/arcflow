@@ -102,7 +102,7 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
 export default function StreamPage() {
   const { isConnected } = useAccount();
   const { writeContract, data: hash, isPending } = useWriteContract();
-  const { isLoading: isMining } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isMining, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const [recipient, setRecipient] = useState("");
   const [monthly, setMonthly] = useState("");
@@ -216,6 +216,12 @@ export default function StreamPage() {
                       {busy ? "Processing..." : "Create stream"}
                       <ArrowUpRight className="h-4 w-4" />
                     </button>
+
+                    {isSuccess && (
+                      <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7]">
+                        Stream created. The recipient can now withdraw accrued funds anytime.
+                      </div>
+                    )}
 
                     {!isConnected && <p className="text-sm text-white/45">Connect wallet to continue.</p>}
                   </div>
