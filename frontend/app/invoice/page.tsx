@@ -171,9 +171,18 @@ export default function InvoicePage() {
                     <ArrowUpRight className="h-4 w-4" />
                   </button>
 
-                  {isSuccess && (
+                  {isSuccess && hash && (
                     <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7]">
-                      Invoice created. Check the explorer for the generated ID.
+                      <p>Invoice created. Open the explorer to find your invoice ID.</p>
+                      <a
+                        href={`https://testnet.arcscan.app/tx/${hash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-1.5 font-medium text-[#ffb38a] underline underline-offset-2"
+                      >
+                        View transaction
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                      </a>
                     </div>
                   )}
                 </div>
