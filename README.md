@@ -22,7 +22,7 @@ ArcFlow is the payment layer for Arc Testnet. Think Stripe, but on-chain — no 
 
 | Contract | Address |
 |----------|---------|
-| ArcFlow (Stream) | [`0xAB78614fED57bB451b70EE194fC4043CADCC39eF`](https://testnet.arcscan.app/address/0xAB78614fED57bB451b70EE194fC4043CADCC39eF) |
+| ArcStream | [`0xAB78614fED57bB451b70EE194fC4043CADCC39eF`](https://testnet.arcscan.app/address/0xAB78614fED57bB451b70EE194fC4043CADCC39eF) |
 | ArcInvoice | [`0x8d533a6DF78ef01F6E4E998588D3Ccb21F668486`](https://testnet.arcscan.app/address/0x8d533a6DF78ef01F6E4E998588D3Ccb21F668486) |
 | ArcPaywall | [`0xb1f95F4d86C743cbe1797C931A9680dF5766633A`](https://testnet.arcscan.app/address/0xb1f95F4d86C743cbe1797C931A9680dF5766633A) |
 
