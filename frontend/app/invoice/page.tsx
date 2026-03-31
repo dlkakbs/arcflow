@@ -206,7 +206,7 @@ export default function InvoicePage() {
                   {isCreateSuccess && createHash && (
                     <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7] space-y-2">
                       {invoiceId !== null ? (
-                        <p>Invoice created. Your invoice ID is <span className="font-bold text-white text-base">#{invoiceId}</span> — share this with the payer.</p>
+                        <p>Invoice created. Your ID is <span className="font-bold text-white text-base">#{invoiceId}</span> — share it with your client to get paid.</p>
                       ) : (
                         <p>Invoice created. Open the explorer to find your invoice ID.</p>
                       )}

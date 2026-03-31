@@ -67,7 +67,7 @@ export default function HowToWorkPage() {
 
             <h1 className="mt-8 text-5xl font-semibold leading-[0.9] tracking-[-0.06em] text-white md:text-7xl lg:text-[86px]">
               How ArcFlow
-              <span className="block text-[#ffb38a]">actually works</span>
+              <span className="block text-[#ffb38a]">works</span>
               <span className="block text-white/85">across every payment flow.</span>
             </h1>
 
