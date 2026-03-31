@@ -105,10 +105,15 @@ function Stat({ label, value, icon }: { label: string; value: string; icon: Reac
 
 export default function PaywallPage() {
   const { address, isConnected } = useAccount();
-  const { writeContract, data: hash, isPending } = useWriteContract();
-  const { isLoading: isMining } = useWaitForTransactionReceipt({ hash });
+
+  const { writeContract: writeDeposit, data: depositHash, isPending: isDepositPending } = useWriteContract();
+  const { writeContract: writeWithdraw, data: withdrawHash, isPending: isWithdrawPending } = useWriteContract();
+
+  const { isLoading: isDepositMining, isSuccess: isDepositSuccess } = useWaitForTransactionReceipt({ hash: depositHash });
+  const { isLoading: isWithdrawMining, isSuccess: isWithdrawSuccess } = useWaitForTransactionReceipt({ hash: withdrawHash });
 
   const [depositAmt, setDepositAmt] = useState("");
+  const [withdrawAmt, setWithdrawAmt] = useState("");
 
   const { data: balance } = useReadContract({
     address: CONTRACTS.arcPaywall,
@@ -133,15 +138,26 @@ export default function PaywallPage() {
     query: { refetchInterval: 60000 },
   });
 
-  const busy = isPending || isMining;
+  const depositBusy = isDepositPending || isDepositMining;
+  const withdrawBusy = isWithdrawPending || isWithdrawMining;
 
   function handleDeposit() {
     if (!depositAmt) return;
-    writeContract({
+    writeDeposit({
       address: CONTRACTS.arcPaywall,
       abi: ABI,
       functionName: "deposit",
       value: parseUnits(depositAmt, 6),
+    });
+  }
+
+  function handleWithdraw() {
+    if (!withdrawAmt) return;
+    writeWithdraw({
+      address: CONTRACTS.arcPaywall,
+      abi: ABI,
+      functionName: "withdraw",
+      args: [parseUnits(withdrawAmt, 6)],
     });
   }
 
@@ -176,59 +192,131 @@ export default function PaywallPage() {
           </div>
         </Reveal>
 
-        <div className="grid gap-6">
+        {isConnected && (
           <Reveal>
-            <GlassCard className="overflow-hidden">
+            <div className="mb-6 grid gap-4 md:grid-cols-3">
+              <Stat
+                label="Balance"
+                value={balance !== undefined ? `${formatUnits(balance, 6)} USDC` : "—"}
+                icon={<Wallet className="h-4 w-4" />}
+              />
+              <Stat
+                label="Requests remaining"
+                value={remaining !== undefined ? remaining.toString() : "—"}
+                icon={<Gauge className="h-4 w-4" />}
+              />
+              <Stat
+                label="Price / request"
+                value={price !== undefined ? `${formatUnits(price, 6)} USDC` : "—"}
+                icon={<Coins className="h-4 w-4" />}
+              />
+            </div>
+          </Reveal>
+        )}
+
+        <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
+          <Reveal className="h-full">
+            <GlassCard className="h-full overflow-hidden flex flex-col">
               <div className="border-b border-white/10 p-7 md:p-8">
                 <p className="text-sm uppercase tracking-[0.24em] text-white/50">Deposit credits</p>
                 <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">Fund your request balance</h2>
               </div>
 
-              <div className="space-y-6 p-7 md:p-8">
-                {isConnected && (
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <Stat
-                      label="Balance"
-                      value={balance !== undefined ? `${formatUnits(balance, 6)} USDC` : "—"}
-                      icon={<Wallet className="h-4 w-4" />}
+              <div className="flex flex-col justify-between flex-1 space-y-5 p-7 md:p-8">
+                <div className="space-y-5">
+                  <div>
+                    <Label>Amount (USDC)</Label>
+                    <Input
+                      type="number"
+                      placeholder="1.00"
+                      step="0.001"
+                      value={depositAmt}
+                      onChange={(e) => setDepositAmt(e.target.value)}
                     />
-                    <Stat
-                      label="Requests remaining"
-                      value={remaining !== undefined ? remaining.toString() : "—"}
-                      icon={<Gauge className="h-4 w-4" />}
-                    />
-                    <Stat
-                      label="Price / request"
-                      value={price !== undefined ? `${formatUnits(price, 6)} USDC` : "—"}
-                      icon={<Coins className="h-4 w-4" />}
-                    />
+                    {requestEstimate !== null && (
+                      <p className="mt-2 text-sm text-white/45">≈ {requestEstimate} requests</p>
+                    )}
                   </div>
-                )}
 
-                <div className="max-w-xl">
-                  <Label>Amount (USDC)</Label>
-                  <Input
-                    type="number"
-                    placeholder="1.00"
-                    step="0.001"
-                    value={depositAmt}
-                    onChange={(e) => setDepositAmt(e.target.value)}
-                  />
-                  {requestEstimate !== null && (
-                    <p className="mt-2 text-sm text-white/45">≈ {requestEstimate} requests</p>
+                  <button
+                    onClick={handleDeposit}
+                    disabled={!isConnected || depositBusy || !depositAmt}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#fff4ec] px-6 py-4 text-sm font-semibold text-[#291c28] transition disabled:opacity-40"
+                  >
+                    {depositBusy ? "Processing..." : "Deposit credits"}
+                    <ArrowUpRight className="h-4 w-4" />
+                  </button>
+
+                  {isDepositSuccess && depositHash && (
+                    <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7] space-y-2">
+                      <p>Deposit confirmed. Your request credits have been added.</p>
+                      <a
+                        href={`https://testnet.arcscan.app/tx/${depositHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 font-medium text-[#ffb38a] underline underline-offset-2"
+                      >
+                        View transaction
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                      </a>
+                    </div>
                   )}
+
+                  {!isConnected && <p className="text-sm text-white/45">Connect wallet to continue.</p>}
                 </div>
+              </div>
+            </GlassCard>
+          </Reveal>
 
-                <button
-                  onClick={handleDeposit}
-                  disabled={!isConnected || busy || !depositAmt}
-                  className="inline-flex w-full max-w-xl items-center justify-center gap-2 rounded-full bg-[#fff4ec] px-6 py-4 text-sm font-semibold text-[#291c28] transition disabled:opacity-40"
-                >
-                  {busy ? "Processing..." : "Deposit credits"}
-                  <ArrowUpRight className="h-4 w-4" />
-                </button>
+          <Reveal className="h-full">
+            <GlassCard className="h-full overflow-hidden flex flex-col">
+              <div className="border-b border-white/10 p-7 md:p-8">
+                <p className="text-sm uppercase tracking-[0.24em] text-white/50">Withdraw credits</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">Recover unused balance</h2>
+              </div>
 
-                {!isConnected && <p className="text-sm text-white/45">Connect wallet to continue.</p>}
+              <div className="flex flex-col justify-between flex-1 space-y-5 p-7 md:p-8">
+                <div className="space-y-5">
+                  <div>
+                    <Label>Amount (USDC)</Label>
+                    <Input
+                      type="number"
+                      placeholder="1.00"
+                      step="0.001"
+                      value={withdrawAmt}
+                      onChange={(e) => setWithdrawAmt(e.target.value)}
+                    />
+                    {balance !== undefined && (
+                      <p className="mt-2 text-sm text-white/45">Available: {formatUnits(balance, 6)} USDC</p>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleWithdraw}
+                    disabled={!isConnected || withdrawBusy || !withdrawAmt}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/14 bg-white/8 px-6 py-4 text-sm font-semibold text-white transition disabled:opacity-40"
+                  >
+                    {withdrawBusy ? "Processing..." : "Withdraw"}
+                    <ArrowUpRight className="h-4 w-4" />
+                  </button>
+
+                  {isWithdrawSuccess && withdrawHash && (
+                    <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7] space-y-2">
+                      <p>Withdrawal confirmed. Funds have been returned to your wallet.</p>
+                      <a
+                        href={`https://testnet.arcscan.app/tx/${withdrawHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 font-medium text-[#ffb38a] underline underline-offset-2"
+                      >
+                        View transaction
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                      </a>
+                    </div>
+                  )}
+
+                  {!isConnected && <p className="text-sm text-white/45">Connect wallet to continue.</p>}
+                </div>
               </div>
             </GlassCard>
           </Reveal>
