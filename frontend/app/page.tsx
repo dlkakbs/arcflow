@@ -163,26 +163,6 @@ export default function HomePage() {
                   <ArrowUpRight className="h-4 w-4" />
                 </Link>
 
-                <div className="flex items-center gap-3">
-                  <a
-                    href="https://testnet.arcscan.app/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/14 bg-white/8 px-5 py-3.5 text-sm font-medium text-white/80 backdrop-blur-md hover:bg-white/12"
-                  >
-                    ArcScan
-                    <ArrowUpRight className="h-3.5 w-3.5" />
-                  </a>
-                  <a
-                    href="https://faucet.circle.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/14 bg-white/8 px-5 py-3.5 text-sm font-medium text-white/80 backdrop-blur-md hover:bg-white/12"
-                  >
-                    Faucet
-                    <ArrowUpRight className="h-3.5 w-3.5" />
-                  </a>
-                </div>
               </div>
             </Reveal>
 
@@ -298,6 +278,29 @@ export default function HomePage() {
           </Reveal>
         </Section>
       </main>
+
+      <div className="flex justify-end px-6 pb-8 md:px-10 lg:px-12">
+        <div className="flex items-center gap-3">
+          <a
+            href="https://testnet.arcscan.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/6 px-4 py-2 text-xs font-medium text-white/55 backdrop-blur-md hover:text-white/80 transition"
+          >
+            ArcScan
+            <ArrowUpRight className="h-3 w-3" />
+          </a>
+          <a
+            href="https://faucet.circle.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/6 px-4 py-2 text-xs font-medium text-white/55 backdrop-blur-md hover:text-white/80 transition"
+          >
+            Faucet
+            <ArrowUpRight className="h-3 w-3" />
+          </a>
+        </div>
+      </div>
     </div>
   );
 }
