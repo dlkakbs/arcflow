@@ -146,12 +146,12 @@ export default function HomePage() {
             <Reveal>
               <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
                 <a
-                  href="https://docs.arc.network/arc/concepts/welcome-to-arc"
+                  href="https://www.arc.network/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="group inline-flex items-center justify-center gap-2 rounded-full bg-[#fff4ec] px-7 py-3.5 text-sm font-semibold text-[#291c28] transition-transform hover:-translate-y-0.5"
                 >
-                  Build on Arc
+                  Explore Arc
                   <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </a>
 
@@ -162,6 +162,27 @@ export default function HomePage() {
                   Explore flows
                   <ArrowUpRight className="h-4 w-4" />
                 </Link>
+
+                <div className="flex items-center gap-3">
+                  <a
+                    href="https://testnet.arcscan.app/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/14 bg-white/8 px-5 py-3.5 text-sm font-medium text-white/80 backdrop-blur-md hover:bg-white/12"
+                  >
+                    ArcScan
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </a>
+                  <a
+                    href="https://faucet.circle.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/14 bg-white/8 px-5 py-3.5 text-sm font-medium text-white/80 backdrop-blur-md hover:bg-white/12"
+                  >
+                    Faucet
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </a>
+                </div>
               </div>
             </Reveal>
 
