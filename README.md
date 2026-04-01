@@ -14,7 +14,7 @@ ArcFlow is the payment layer for Arc Testnet. Think Stripe, but on-chain — no 
 |--------|-------------|
 | **Stream** | Per-second salary, subscription, or vesting payments |
 | **Invoice** | Create & pay USDC invoices with shareable IDs |
-| **Paywall** | Deposit credits, gate API calls at sub-cent rates per request |
+| **Paywall** | Marketplace for pay-per-request APIs and AI agents — clients deposit credits, providers publish services, payments settle on-chain |
 
 ---
 
@@ -84,9 +84,15 @@ Generate a USDC invoice and share the numeric ID with your client. The client pa
 
 ### Paywall
 
-Deposit USDC credits once. Each API request is signed off-chain (no gas) and queued. The contract deployer (owner) batches up to 50 signatures into a single `redeemBatch` transaction — payments flow from the contract to the owner only at that point, not per request. Unsettled queues are swept hourly by a cron job.
+ArcFlow's Paywall is a two-sided marketplace for pay-per-request APIs and AI agents.
 
-The frontend includes a live demo so you can see the signing flow and credits deducted in real time.
+**For clients:**
+Deposit USDC credits once. Browse available services in the marketplace, select one, and start sending requests. Each request is signed off-chain (no gas) and queued. Credits are deducted per call — no subscriptions, no API keys, no billing surprises.
+
+**For service providers:**
+Register your API or AI agent endpoint on the Paywall page. Your backend URL stays private — ArcFlow issues a proxy URL that you share publicly (or list in the marketplace). Clients call the proxy; ArcFlow verifies their on-chain balance, forwards the request to your endpoint, and queues the micropayment. Payments are batched and settled on-chain: up to 50 signatures in a single `redeemBatch` transaction, swept by a cron job.
+
+The frontend includes a live demo (Arc AI Assistant) so you can see the signing flow and credits deducted in real time.
 
 **Security model:**
 - **Domain separation:** every signature commits to `address(this)` + `chainId`, preventing replay across contracts or chains
