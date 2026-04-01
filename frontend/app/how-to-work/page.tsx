@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Sparkles, Waves, Receipt, LockKeyhole, ArrowUpRight } from "lucide-react";
+import { Sparkles, Waves, Receipt, LockKeyhole, ArrowUpRight, Code2 } from "lucide-react";
 
 const MODULES = [
   {
@@ -33,18 +33,40 @@ const MODULES = [
   {
     href: "/paywall",
     title: "Paywall",
-    subtitle: "Pay 0.001 USDC per API request",
-    what: "Deposit USDC upfront to unlock access to a service or API. Sign each request off-chain — no gas. Payments settle in batches, keeping costs near zero.",
+    subtitle: "A marketplace for pay-per-request APIs and AI agents",
+    what: "ArcFlow's Paywall connects two sides: clients who pay per request and service providers who earn per call. No subscriptions, no API keys, no intermediaries — payments settle on-chain in batches.",
     useCases: [
-      "API monetization — charge per call",
-      "Data APIs paid by actual usage",
-      "Micropayment-based digital access",
+      "AI agent APIs monetized per call",
+      "Data feeds billed by actual usage",
+      "Any service that shouldn't need a subscription",
     ],
     icon: LockKeyhole,
     accent: "text-[#ffb38a]",
     glow: "from-[#ffb38a]/20 via-white/5 to-transparent",
+    roles: [
+      {
+        icon: Code2,
+        label: "Service providers",
+        steps: [
+          "Register your API or AI agent endpoint",
+          "Your backend URL stays private — clients get a proxy URL",
+          "Service appears in the marketplace automatically",
+          "Earn USDC per request, settled on-chain in batches",
+        ],
+      },
+      {
+        icon: LockKeyhole,
+        label: "Clients",
+        steps: [
+          "Browse available services in the marketplace",
+          "Deposit USDC credits once",
+          "Sign each request off-chain — zero gas",
+          "Credits deduct per call; withdraw unused balance anytime",
+        ],
+      },
+    ],
   },
-];
+] as const;
 
 const REQUIREMENTS = [
   { label: "Wallet", value: "EVM-compatible" },
@@ -133,6 +155,32 @@ export default function HowToWorkPage() {
                       ))}
                     </div>
                   </div>
+
+                  {"roles" in m && m.roles && (
+                    <div className="mt-6 grid gap-4 md:grid-cols-2">
+                      {m.roles.map((role) => {
+                        const RoleIcon = role.icon;
+                        return (
+                          <div key={role.label} className="rounded-[1.6rem] border border-white/10 bg-black/20 p-6">
+                            <div className="flex items-center gap-3 mb-5">
+                              <div className="rounded-xl border border-white/12 bg-white/8 p-2">
+                                <RoleIcon className="h-4 w-4 text-[#ffb38a]" />
+                              </div>
+                              <p className="text-sm font-semibold tracking-[-0.01em] text-white">{role.label}</p>
+                            </div>
+                            <ol className="space-y-3">
+                              {role.steps.map((step, i) => (
+                                <li key={step} className="flex items-start gap-3 text-sm leading-6 text-white/60">
+                                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/8 text-[10px] font-semibold text-white/50">{i + 1}</span>
+                                  {step}
+                                </li>
+                              ))}
+                            </ol>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             );
