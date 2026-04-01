@@ -6,30 +6,77 @@ import { publicClient, PAYWALL_ADDRESS, PAYWALL_ABI, arcTestnet } from '@/lib/ar
 import { createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
-const DEMO_RESPONSES: Record<string, string> = {
-  default: 'ArcFlow enables usage-based payments onchain.',
-  stream:  'Streaming payments on ArcFlow accrue every second. Recipients can withdraw anytime.',
-  invoice: 'ArcFlow invoices are settled on-chain. Create one, share the ID, and the payer sends USDC directly.',
-  paywall: 'The paywall model lets you deposit USDC upfront and consume credits per API call — no subscription.',
-  usdc:    'ArcFlow uses native USDC on Arc Testnet. Sub-cent transactions make micropayments viable.',
-  arc:     'Arc is a high-throughput EVM chain with native USDC. ArcFlow is built natively on Arc.',
-  how:     'ArcFlow has three primitives: Stream (continuous), Invoice (one-time), Paywall (per-request).',
+function getArcAiResponse(prompt: string): string {
+  const q = prompt.toLowerCase()
+
+  // ArcFlow / Arc specific
+  if (q.includes('arcflow'))      return 'ArcFlow is a payment infrastructure built on Arc Testnet. It has three primitives: Stream for continuous payments, Invoice for one-time requests, and Paywall for per-request micropayments — all settled in native USDC.'
+  if (q.includes('stream') && (q.includes('payment') || q.includes('salary') || q.includes('retainer'))) return 'Payment streams on ArcFlow accrue every second. The payer deposits USDC upfront and sets a monthly rate; the recipient can withdraw their earned balance at any time without asking the payer.'
+  if (q.includes('invoice'))      return 'ArcFlow invoices are settled on-chain. The creator sets an amount and description, shares the invoice ID, and the payer sends USDC directly to the contract. No intermediary, no chargebacks.'
+  if (q.includes('paywall'))      return 'The Paywall model lets users deposit USDC once and consume request credits over time. Each API call deducts one credit off-chain using a signed message — no gas per request. A batch settler rolls up signatures on-chain periodically.'
+  if (q.includes('arc testnet') || q.includes('arc chain') || q.includes('arc network')) return 'Arc is a high-throughput EVM-compatible chain with native USDC support. It enables sub-cent transactions, making micropayments and streaming payments practical for the first time.'
+  if (q.includes('usdc'))         return 'ArcFlow uses Circle\'s native USDC on Arc Testnet. Because Arc has very low fees, even 0.001 USDC per-request payments are economically viable — something impossible on Ethereum mainnet.'
+  if (q.includes('batch') || q.includes('settle')) return 'ArcFlow\'s batch settlement collects off-chain signed payment authorizations and submits them in a single transaction. This reduces gas costs dramatically — 50 payments cost the same as 1 on-chain transfer.'
+
+  // Crypto / Web3
+  if (q.includes('defi'))         return 'DeFi (Decentralized Finance) refers to financial services built on blockchains — lending, trading, payments — without traditional intermediaries like banks. Smart contracts automate the rules, and anyone with a wallet can participate.'
+  if (q.includes('smart contract')) return 'A smart contract is self-executing code deployed on a blockchain. Once deployed, it runs exactly as written with no possibility of downtime, censorship, or third-party interference. ArcFlow\'s payment logic lives in smart contracts on Arc.'
+  if (q.includes('wallet'))       return 'A crypto wallet stores your private keys and lets you sign transactions. You never "store" tokens in a wallet — they live on-chain. The wallet just proves ownership. MetaMask, Coinbase Wallet, and Rainbow are popular options.'
+  if (q.includes('gas'))          return 'Gas is the fee paid to validators for processing transactions on EVM chains. High gas on Ethereum mainnet makes micropayments impractical. Chains like Arc solve this with lower fees, enabling new payment models.'
+  if (q.includes('evm'))          return 'EVM (Ethereum Virtual Machine) is the runtime environment for smart contracts. EVM-compatible chains like Arc, Polygon, and Base let you deploy the same Solidity code across networks.'
+  if (q.includes('nft'))          return 'NFTs (Non-Fungible Tokens) are unique digital assets on a blockchain. Unlike USDC (fungible — every unit is identical), each NFT has distinct properties. They\'re used for digital art, gaming items, and on-chain credentials.'
+  if (q.includes('layer 2') || q.includes('l2')) return 'Layer 2s are networks built on top of Ethereum to handle transactions more efficiently. They batch transactions and post proofs back to Ethereum. Examples include Arbitrum, Optimism, and Base.'
+
+  // Coding / Tech
+  if (q.includes('solidity'))     return 'Solidity is the primary language for writing Ethereum smart contracts. It\'s statically typed and compiles to EVM bytecode. Key concepts: state variables, functions, events, modifiers, and mappings.'
+  if (q.includes('react'))        return 'React is a JavaScript library for building user interfaces. It uses a component model where UI is broken into reusable pieces, each managing its own state. ArcFlow\'s frontend is built with Next.js, which extends React with server rendering and routing.'
+  if (q.includes('typescript'))   return 'TypeScript adds static types to JavaScript, catching errors at compile time rather than runtime. It\'s especially valuable in large codebases — you get autocomplete, refactoring safety, and clearer contracts between components.'
+  if (q.includes('api'))          return 'An API (Application Programming Interface) defines how software components communicate. REST APIs use HTTP methods (GET, POST, etc.) over URLs. ArcFlow\'s paywall is essentially an on-chain API billing system — users pay per call.'
+  if (q.includes('database') || q.includes('redis')) return 'Redis is an in-memory data store used for caching, queues, and real-time data. ArcFlow uses Upstash Redis to store payment signature queues and idempotency keys before batch settlement.'
+  if (q.includes('next.js') || q.includes('nextjs')) return 'Next.js is a React framework that adds server-side rendering, API routes, and file-based routing. ArcFlow\'s frontend and backend API both run in a single Next.js app deployed on Vercel.'
+
+  // Finance / Business
+  if (q.includes('subscription'))  return 'Subscriptions charge a flat fee regardless of usage. Pay-per-use models like ArcFlow\'s Paywall only charge for what\'s actually consumed — better for users with variable usage and easier for providers to price fairly.'
+  if (q.includes('micropayment'))  return 'Micropayments are very small transactions — fractions of a cent to a few cents. They\'ve been theorized since the early web but were impractical due to high transaction fees. Blockchains with low fees and native stablecoins finally make them viable.'
+  if (q.includes('revenue') || q.includes('monetize') || q.includes('monetisation')) return 'For API providers, per-request billing aligns revenue directly with value delivered. No free-tier abuse, no churn from billing surprises — users deposit upfront and credits drain as they use the service.'
+
+  // General knowledge
+  if (q.includes('explain') || q.includes('what is') || q.includes('what are')) {
+    const topic = prompt.replace(/explain|what is|what are/gi, '').trim()
+    if (topic.length > 2) return `${topic.charAt(0).toUpperCase() + topic.slice(1)} is a concept worth exploring in depth. To give you a precise answer, could you provide more context? For example, are you asking from a technical, financial, or general perspective?`
+  }
+  if (q.includes('how does') || q.includes('how do'))  return 'Great question. The short answer depends on the specifics — could you narrow it down a bit? I can go deep on blockchain infrastructure, payment systems, smart contracts, or general software architecture.'
+  if (q.includes('best practice') || q.includes('best way')) return 'Best practices vary by context, but a few universals: keep it simple, test edge cases, handle failures gracefully, and don\'t optimize prematurely. In Web3 specifically: audit your contracts, use established patterns, and minimize on-chain storage.'
+  if (q.includes('hello') || q.includes('hi ') || q.startsWith('hi') || q.includes('hey')) return 'Hey! I\'m the Arc AI Assistant — powered by ArcFlow\'s per-request payment system. Ask me anything about crypto, payments, smart contracts, or software engineering.'
+  if (q.includes('thank'))        return 'You\'re welcome! Each of these responses costs exactly 0.001 USDC, deducted from your on-chain balance. That\'s ArcFlow in action — pay only for what you use.'
+  if (q.includes('joke') || q.includes('funny')) return 'Why did the smart contract break up with the oracle? It couldn\'t trust anything that came from outside the chain. 🔗'
+  if (q.includes('price') || q.includes('cost') || q.includes('expensive')) return 'This request cost you 0.001 USDC — about a tenth of a cent. Traditional payment APIs charge monthly fees regardless of usage. ArcFlow\'s model means you only pay for actual calls, settled on-chain with no intermediary.'
+
+  // Fallback — still useful
+  return `You asked: "${prompt.length > 80 ? prompt.slice(0, 80) + '…' : prompt}". I'm the Arc AI Assistant — a general-purpose agent running on ArcFlow's per-request payment infrastructure. I can help with crypto, smart contracts, coding, payments, and more. Try asking something specific!`
 }
 
-function getDemoResponse(prompt: string): string {
-  const lower = prompt.toLowerCase()
-  if (lower.includes('stream') || lower.includes('salary'))   return DEMO_RESPONSES.stream
-  if (lower.includes('invoice') || lower.includes('bill'))    return DEMO_RESPONSES.invoice
-  if (lower.includes('paywall') || lower.includes('credit'))  return DEMO_RESPONSES.paywall
-  if (lower.includes('usdc') || lower.includes('token'))      return DEMO_RESPONSES.usdc
-  if (lower.includes('arc') || lower.includes('chain'))       return DEMO_RESPONSES.arc
-  if (lower.includes('how') || lower.includes('what'))        return DEMO_RESPONSES.how
-  return DEMO_RESPONSES.default
+function getImageGenResponse(prompt: string): string {
+  return `Image generation request received for: "${prompt.length > 60 ? prompt.slice(0, 60) + '…' : prompt}". In production this would return a generated image URL. This demo service is coming in v2 — the payment flow (deposit → sign → settle) works exactly the same as Arc AI Assistant.`
+}
+
+function getCodeReviewResponse(prompt: string): string {
+  const q = prompt.toLowerCase()
+  if (q.includes('function') || q.includes('def ') || q.includes('const ') || q.includes('class ')) {
+    return `Code review complete. Observations: (1) Consider adding explicit return types for clarity. (2) Extract magic numbers into named constants. (3) Add input validation at the function boundary. (4) The logic looks sound — no obvious security issues detected. Payment deducted: 0.002 USDC.`
+  }
+  return `Code Review Agent ready. Paste a function, class, or describe what you'd like reviewed — I'll check for logic errors, security issues, and style improvements. Each review costs 0.002 USDC, settled on-chain via ArcFlow.`
+}
+
+function getDemoResponse(prompt: string, serviceId?: string): string {
+  if (serviceId === 'svc_demo_img')  return getImageGenResponse(prompt)
+  if (serviceId === 'svc_demo_code') return getCodeReviewResponse(prompt)
+  return getArcAiResponse(prompt)
 }
 
 export async function POST(req: NextRequest) {
   try {
-  const { reservationId, idempotencyKey, signature, prompt, clientAddress } = await req.json()
+  const { reservationId, idempotencyKey, signature, prompt, clientAddress, serviceId } = await req.json()
 
   if (!reservationId || !idempotencyKey || !signature || !clientAddress) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -109,8 +156,8 @@ export async function POST(req: NextRequest) {
   const result = {
     success: true,
     response: {
-      message:   getDemoResponse(prompt ?? ''),
-      model:     'arcflow-demo-v1',
+      message:   getDemoResponse(prompt ?? '', serviceId),
+      model:     serviceId === 'svc_demo_img' ? 'arc-image-gen-v1' : serviceId === 'svc_demo_code' ? 'arc-code-review-v1' : 'arc-ai-assistant-v1',
       timestamp: new Date().toISOString(),
     },
     creditsUsed:      1,

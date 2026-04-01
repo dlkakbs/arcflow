@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract, useSignMessage } from "wagmi";
 import { formatUnits, parseUnits, keccak256, encodePacked, toBytes } from "viem";
@@ -8,7 +8,7 @@ import { CONTRACTS } from "@/lib/wagmi";
 import { PAYWALL_ADDRESS } from "@/lib/arcChain";
 
 const ARC_CHAIN_ID = 5042002;
-import { ArrowUpRight, Sparkles, Wallet, Gauge, Coins, Zap, Code2 } from "lucide-react";
+import { ArrowUpRight, Sparkles, Wallet, Gauge, Coins, Zap, Code2, LayoutGrid, CheckCircle2 } from "lucide-react";
 
 const ABI = [
   {
@@ -47,6 +47,42 @@ const ABI = [
     outputs: [{ name: "", type: "uint256" }],
   },
 ] as const;
+
+type ServiceEntry = {
+  serviceId: string;
+  name: string;
+  desc: string;
+  price: string;
+  proxyUrl: string;
+  demo?: boolean;
+};
+
+const DEMO_SERVICES: ServiceEntry[] = [
+  {
+    serviceId: "svc_demo_ai",
+    name: "Arc AI Assistant",
+    desc: "General-purpose AI chat powered by Claude. Ask anything, get answers instantly.",
+    price: "0.001",
+    proxyUrl: "https://flowonarc.vercel.app/api/request",
+    demo: true,
+  },
+  {
+    serviceId: "svc_demo_img",
+    name: "Image Generator",
+    desc: "Text-to-image generation via Stable Diffusion. High-res output, no subscription.",
+    price: "0.005",
+    proxyUrl: "https://flowonarc.vercel.app/api/proxy?service=svc_demo_img",
+    demo: true,
+  },
+  {
+    serviceId: "svc_demo_code",
+    name: "Code Review Agent",
+    desc: "Automated PR analysis and improvement suggestions. Integrates with any git workflow.",
+    price: "0.002",
+    proxyUrl: "https://flowonarc.vercel.app/api/proxy?service=svc_demo_code",
+    demo: true,
+  },
+];
 
 const reveal = {
   hidden: { opacity: 0, y: 36 },
@@ -122,20 +158,41 @@ export default function PaywallPage() {
   const [apiResult, setApiResult] = useState<null | { success?: boolean; response?: { message: string; model: string; timestamp: string }; creditsUsed?: number; creditsRemaining?: string; error?: string }>(null);
   const [apiLoading, setApiLoading] = useState(false);
 
+  // Service browse & selection
+  const [services, setServices] = useState<ServiceEntry[]>(DEMO_SERVICES);
+  const [selectedServiceId, setSelectedServiceId] = useState<string>("svc_demo_ai");
+
+  useEffect(() => {
+    try {
+      const local: ServiceEntry[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith("arcflow_service_")) {
+          const raw = localStorage.getItem(key);
+          if (raw) local.push(JSON.parse(raw) as ServiceEntry);
+        }
+      }
+      if (local.length > 0) setServices([...DEMO_SERVICES, ...local]);
+    } catch { /* ignore */ }
+  }, []);
+
+  const selectedService = services.find((s) => s.serviceId === selectedServiceId) ?? services[0];
+
   // Service registration state
   const [svcName, setSvcName] = useState("");
   const [svcEndpoint, setSvcEndpoint] = useState("");
   const [svcPrice, setSvcPrice] = useState("0.001");
   const [svcDesc, setSvcDesc] = useState("");
-  const [svcResult, setSvcResult] = useState<null | { serviceId: string; proxyUrl: string }>(null);
+  const [svcResult, setSvcResult] = useState<null | ServiceEntry>(null);
 
   const handleRegisterService = useCallback(() => {
     if (!svcName.trim() || !svcEndpoint.trim()) return;
     const serviceId = `svc_${Date.now().toString(36)}`;
     const proxyUrl = `https://flowonarc.vercel.app/api/proxy?service=${serviceId}`;
-    const entry = { serviceId, name: svcName, endpoint: svcEndpoint, price: svcPrice, desc: svcDesc, proxyUrl };
-    try { localStorage.setItem(`arcflow_service_${serviceId}`, JSON.stringify(entry)); } catch { /* ignore */ }
-    setSvcResult({ serviceId, proxyUrl });
+    const entry: ServiceEntry = { serviceId, name: svcName, desc: svcDesc, price: svcPrice, proxyUrl };
+    try { localStorage.setItem(`arcflow_service_${serviceId}`, JSON.stringify({ ...entry, endpoint: svcEndpoint })); } catch { /* ignore */ }
+    setServices((prev) => [...prev, entry]);
+    setSvcResult(entry);
   }, [svcName, svcEndpoint, svcPrice, svcDesc]);
 
   const { data: balance } = useReadContract({
@@ -179,7 +236,6 @@ export default function PaywallPage() {
     setApiLoading(true);
     setApiResult(null);
     try {
-      // 1. Nonce rezerve et — server authoritative pricePerRequest döner
       const nonceRes = await fetch("/api/get-nonce", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -188,7 +244,6 @@ export default function PaywallPage() {
       const { nonce, reservationId, deadline, pricePerRequest, error: nonceErr } = await nonceRes.json();
       if (nonceErr) { setApiResult({ error: nonceErr }); return; }
 
-      // 2. Hash oluştur (contract ile aynı encoding)
       const msgHash = keccak256(
         encodePacked(
           ["address", "uint256", "address", "uint256", "uint256", "uint256"],
@@ -203,10 +258,8 @@ export default function PaywallPage() {
         )
       );
 
-      // 3. Off-chain imzala — gas yok, zincire gitmez
       const signature = await signMessageAsync({ message: { raw: toBytes(msgHash) } });
 
-      // 4. API'ye gönder — imza queue'ya eklenir, response anında döner
       const idempotencyKey = crypto.randomUUID();
       const reqRes = await fetch("/api/request", {
         method: "POST",
@@ -217,6 +270,7 @@ export default function PaywallPage() {
           signature,
           prompt: prompt.trim(),
           clientAddress: address,
+          serviceId: selectedServiceId,
         }),
       });
       const data = await reqRes.json();
@@ -399,17 +453,28 @@ export default function PaywallPage() {
             </GlassCard>
           </Reveal>
         </div>
-        <Reveal>
-          <GlassCard className="mt-6 overflow-hidden">
+
+        {/* Live demo + Available services — side by side */}
+        <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:items-stretch">
+        <Reveal className="h-full">
+          <GlassCard className="h-full overflow-hidden flex flex-col">
             <div className="border-b border-white/10 p-7 md:p-8">
-              <div className="flex items-center gap-3">
-                <div className="rounded-2xl border border-white/12 bg-black/20 p-3">
-                  <Zap className="h-5 w-5 text-[#ffb38a]" />
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-2xl border border-white/12 bg-black/20 p-3">
+                    <Zap className="h-5 w-5 text-[#ffb38a]" />
+                  </div>
+                  <div>
+                    <p className="text-sm uppercase tracking-[0.24em] text-white/50">Live demo</p>
+                    <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Try a paid API request</h2>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm uppercase tracking-[0.24em] text-white/50">Live demo</p>
-                  <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Try a paid API request</h2>
-                </div>
+                {selectedService && (
+                  <div className="flex items-center gap-2 rounded-full border border-[#ffb38a]/20 bg-[#ffb38a]/10 px-4 py-1.5 text-xs text-[#ffd7c7]">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#ffb38a]" />
+                    {selectedService.name}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -421,7 +486,13 @@ export default function PaywallPage() {
               <div className="mt-6 space-y-3 max-w-xl">
                 <textarea
                   rows={3}
-                  placeholder="Ask something..."
+                  placeholder={
+                    selectedServiceId === "svc_demo_img"
+                      ? "Describe the image you want to generate..."
+                      : selectedServiceId === "svc_demo_code"
+                      ? "Paste your code or describe what you want reviewed..."
+                      : "Ask anything — crypto, coding, payments, general knowledge..."
+                  }
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={(e) => {
@@ -473,7 +544,64 @@ export default function PaywallPage() {
           </GlassCard>
         </Reveal>
 
-        {/* Register your service */}
+        {/* Available services — right column */}
+        <Reveal className="h-full">
+          <GlassCard className="h-full overflow-hidden flex flex-col">
+            <div className="border-b border-white/10 p-7 md:p-8">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl border border-white/12 bg-black/20 p-3">
+                  <LayoutGrid className="h-5 w-5 text-[#ffb38a]" />
+                </div>
+                <div>
+                  <p className="text-sm uppercase tracking-[0.24em] text-white/50">Marketplace</p>
+                  <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Available services</h2>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col flex-1 p-7 md:p-8">
+              <p className="mb-5 text-sm leading-7 text-white/60">
+                Pick a service below — it will be used when you send a request.
+              </p>
+
+              <div className="flex flex-col gap-3 flex-1">
+                {services.map((svc) => {
+                  const isSelected = svc.serviceId === selectedServiceId;
+                  return (
+                    <button
+                      key={svc.serviceId}
+                      onClick={() => setSelectedServiceId(svc.serviceId)}
+                      className={`relative flex items-start gap-4 rounded-[1.4rem] border p-4 text-left transition ${
+                        isSelected
+                          ? "border-[#ffb38a]/50 bg-[#ffb38a]/10"
+                          : "border-white/10 bg-black/20 hover:border-white/20 hover:bg-black/30"
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold tracking-[-0.02em] text-white">{svc.name}</p>
+                          {svc.demo && (
+                            <span className="rounded-full border border-white/12 bg-white/8 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-white/35">Demo</span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-white/45 line-clamp-2">{svc.desc}</p>
+                        <div className="mt-2 inline-flex items-center rounded-full border border-[#ffb38a]/20 bg-[#ffb38a]/10 px-2.5 py-0.5 text-[11px] font-medium text-[#ffd7c7]">
+                          {svc.price} USDC / req
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-[#ffb38a]" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </GlassCard>
+        </Reveal>
+        </div>{/* end Live demo + Available services grid */}
+
+        {/* Publish your service */}
         <Reveal>
           <GlassCard className="mt-6 overflow-hidden">
             <div className="border-b border-white/10 p-7 md:p-8">
@@ -490,7 +618,7 @@ export default function PaywallPage() {
 
             <div className="p-7 md:p-8">
               <p className="max-w-xl text-sm leading-7 text-white/60">
-                Register your API or AI agent here. Clients will fund their ArcFlow balance and send requests through your service endpoint — you get paid per call, settled on-chain.
+                Register your API or AI agent here. Your backend endpoint stays private — clients discover your service in the marketplace above and pay per request, settled on-chain.
               </p>
 
               {!svcResult ? (
@@ -510,7 +638,7 @@ export default function PaywallPage() {
                       value={svcEndpoint}
                       onChange={(e) => setSvcEndpoint(e.target.value)}
                     />
-                    <p className="mt-2 text-xs text-white/35">ArcFlow proxies client requests to this URL after verifying on-chain balance.</p>
+                    <p className="mt-2 text-xs text-white/35">Private — only ArcFlow sees this. Clients receive a proxy URL instead.</p>
                   </div>
                   <div>
                     <Label>Price per request (USDC)</Label>
@@ -525,7 +653,7 @@ export default function PaywallPage() {
                   <div>
                     <Label>Description (optional)</Label>
                     <Input
-                      placeholder="One-line description of what your service does"
+                      placeholder="One-line description shown in the marketplace"
                       value={svcDesc}
                       onChange={(e) => setSvcDesc(e.target.value)}
                     />
@@ -542,17 +670,16 @@ export default function PaywallPage() {
               ) : (
                 <div className="mt-6 max-w-xl space-y-4">
                   <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-5 text-sm text-[#ffd7c7] space-y-3">
-                    <p className="font-semibold text-white">Your service is registered.</p>
-                    <p className="text-white/60">Clients can reach your service through the ArcFlow proxy. Share the URL below — every request is metered and settled on-chain.</p>
+                    <p className="font-semibold text-white">Your service is live in the marketplace.</p>
+                    <p className="text-white/60">Clients can now discover and select it above. Every request is metered and settled on-chain — your backend endpoint stays private.</p>
                     <div className="space-y-2">
                       <p className="text-xs uppercase tracking-[0.2em] text-white/40">Service ID</p>
                       <code className="block rounded-xl bg-black/30 px-4 py-2.5 text-sm text-white font-mono">{svcResult.serviceId}</code>
                     </div>
                     <div className="space-y-2">
-                      <p className="text-xs uppercase tracking-[0.2em] text-white/40">Proxy URL (share with clients)</p>
+                      <p className="text-xs uppercase tracking-[0.2em] text-white/40">Proxy URL</p>
                       <code className="block rounded-xl bg-black/30 px-4 py-2.5 text-sm text-[#ffb38a] font-mono break-all">{svcResult.proxyUrl}</code>
                     </div>
-                    <p className="text-xs text-white/35">Clients send requests here with their wallet address. ArcFlow verifies their balance, forwards to your endpoint, and queues the payment.</p>
                   </div>
                   <button
                     onClick={() => { setSvcResult(null); setSvcName(""); setSvcEndpoint(""); setSvcPrice("0.001"); setSvcDesc(""); }}
