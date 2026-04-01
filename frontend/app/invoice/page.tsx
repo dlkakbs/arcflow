@@ -129,7 +129,7 @@ export default function InvoicePage() {
   const createBusy = isCreatePending || isCreateMining;
   const payBusy = isPayPending || isPayMining;
 
-  const showCreateSuccess = useAutoHide(isCreateSuccess);
+  const showCreateSuccess = isCreateSuccess; // keep visible — user needs the invoice ID
   const showPaySuccess = useAutoHide(isPaySuccess);
 
   // Extract invoice ID from receipt logs

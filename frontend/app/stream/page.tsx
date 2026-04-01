@@ -160,6 +160,14 @@ export default function StreamPage() {
   const showCreateSuccess = useAutoHide(isSuccess);
   const showWithdrawSuccess = useAutoHide(isWithdrawSuccess);
   const showCancelSuccess = useAutoHide(isCancelSuccess);
+  const [cancelBanner, setCancelBanner] = useState<string | null>(null);
+  useEffect(() => {
+    if (isCancelSuccess && cancellingId !== null) {
+      setCancelBanner(`Stream #${cancellingId} cancelled. Unspent deposit returned to your wallet.`);
+      const t = setTimeout(() => setCancelBanner(null), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [isCancelSuccess, cancellingId]);
 
   const [recipient, setRecipient] = useState("");
   const [monthly, setMonthly] = useState("");
@@ -266,6 +274,8 @@ export default function StreamPage() {
   }, [allStreamsRaw, allWithdrawableRaw, address]);
 
   const activeMyStreams = myStreams.filter((s) => s.active);
+  // If user has ever sent a stream (active or cancelled), hide the recipient lookup
+  const hasEverSentStream = myStreams.length > 0;
 
   const totalMonthlyOut = activeMyStreams.reduce((acc, s) => acc + Number(formatUnits(s.rate, 6)) * 2_592_000, 0);
   const totalDeposited = activeMyStreams.reduce((acc, s) => acc + Number(formatUnits(s.deposit, 6)), 0);
@@ -456,8 +466,17 @@ export default function StreamPage() {
             </GlassCard>
           </Reveal>
 
-          {/* Live stream status — always visible */}
-          <Reveal>
+          {/* Cancel success banner — outside stream rows so it survives row removal */}
+          {cancelBanner && (
+            <Reveal>
+              <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 px-5 py-4 text-sm text-[#ffd7c7]">
+                {cancelBanner}
+              </div>
+            </Reveal>
+          )}
+
+          {/* Live stream status — only for non-senders */}
+          {!hasEverSentStream && <Reveal>
             <GlassCard className="overflow-hidden">
               <div className="border-b border-white/10 p-7 md:p-8">
                 <div className="flex items-center justify-between gap-4">
@@ -591,7 +610,7 @@ export default function StreamPage() {
                 )}
               </div>
             </GlassCard>
-          </Reveal>
+          </Reveal>}
 
           {/* Active streams */}
           {isConnected && activeMyStreams.length > 0 && (
@@ -676,9 +695,6 @@ export default function StreamPage() {
                             >
                               {isCancelling ? "Cancelling…" : "Cancel"}
                             </button>
-                            {showCancelSuccess && cancellingId === s.id && (
-                              <p className="mt-1 text-xs text-white/45">Stream cancelled. Unspent deposit returned.</p>
-                            )}
                           </div>
                         </div>
                       );

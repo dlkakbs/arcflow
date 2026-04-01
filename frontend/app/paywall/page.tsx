@@ -225,7 +225,7 @@ export default function PaywallPage() {
   useEffect(() => {
     if (svcResult) {
       setSvcResultVisible(true);
-      svcResultTimerRef.current = setTimeout(() => setSvcResultVisible(false), 10000);
+      svcResultTimerRef.current = setTimeout(() => setSvcResultVisible(false), 30000);
     }
     return () => { if (svcResultTimerRef.current) clearTimeout(svcResultTimerRef.current); };
   }, [svcResult]);
@@ -695,7 +695,7 @@ export default function PaywallPage() {
                         </button>
                       </div>
                     </div>
-                    <p className="text-xs text-white/30">This panel disappears in 10 seconds — copy your proxy URL now.</p>
+                    <p className="text-xs text-white/30">This panel disappears in 30 seconds — copy your proxy URL now.</p>
                   </div>
                   <button
                     onClick={() => { setSvcResult(null); setSvcName(""); setSvcEndpoint(""); setSvcPrice("0.001"); setSvcDesc(""); }}
