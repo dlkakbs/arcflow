@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract, useSignMessage } from "wagmi";
+import { useAutoHide } from "@/lib/useAutoHide";
 import { formatUnits, parseUnits, keccak256, encodePacked, toBytes } from "viem";
 import { CONTRACTS } from "@/lib/wagmi";
 import { PAYWALL_ADDRESS } from "@/lib/arcChain";
@@ -132,6 +133,7 @@ export default function PaywallPage() {
   const { writeContract: writeDeposit, data: depositHash, isPending: isDepositPending } = useWriteContract();
   const { writeContract: writeWithdraw, data: withdrawHash, isPending: isWithdrawPending } = useWriteContract();
   const { signMessageAsync } = useSignMessage();
+  const [svcSigning, setSvcSigning] = useState(false);
 
   const { isLoading: isDepositMining, isSuccess: isDepositSuccess } = useWaitForTransactionReceipt({ hash: depositHash });
   const { isLoading: isWithdrawMining, isSuccess: isWithdrawSuccess } = useWaitForTransactionReceipt({ hash: withdrawHash });
@@ -169,15 +171,24 @@ export default function PaywallPage() {
   const [svcDesc, setSvcDesc] = useState("");
   const [svcResult, setSvcResult] = useState<null | ServiceEntry>(null);
 
-  const handleRegisterService = useCallback(() => {
-    if (!svcName.trim() || !svcEndpoint.trim()) return;
-    const serviceId = `svc_${Date.now().toString(36)}`;
-    const proxyUrl = `https://flowonarc.vercel.app/api/proxy?service=${serviceId}`;
-    const entry: ServiceEntry = { serviceId, name: svcName, desc: svcDesc, price: svcPrice, proxyUrl };
-    try { localStorage.setItem(`arcflow_service_${serviceId}`, JSON.stringify({ ...entry, endpoint: svcEndpoint })); } catch { /* ignore */ }
-    setServices((prev) => [...prev, entry]);
-    setSvcResult(entry);
-  }, [svcName, svcEndpoint, svcPrice, svcDesc]);
+  const handleRegisterService = useCallback(async () => {
+    if (!svcName.trim() || !svcEndpoint.trim() || !address) return;
+    setSvcSigning(true);
+    try {
+      const serviceId = `svc_${Date.now().toString(36)}`;
+      const message = `I am publishing "${svcName}" on ArcFlow.\nEndpoint: ${svcEndpoint}\nPrice: ${svcPrice} USDC/request\nService ID: ${serviceId}`;
+      await signMessageAsync({ message });
+      const proxyUrl = `https://flowonarc.vercel.app/api/proxy?service=${serviceId}`;
+      const entry: ServiceEntry = { serviceId, name: svcName, desc: svcDesc, price: svcPrice, proxyUrl };
+      try { localStorage.setItem(`arcflow_service_${serviceId}`, JSON.stringify({ ...entry, endpoint: svcEndpoint })); } catch { /* ignore */ }
+      setServices((prev) => [...prev, entry]);
+      setSvcResult(entry);
+    } catch {
+      // user rejected signature — do nothing
+    } finally {
+      setSvcSigning(false);
+    }
+  }, [svcName, svcEndpoint, svcPrice, svcDesc, address, signMessageAsync]);
 
   const { data: balance } = useReadContract({
     address: CONTRACTS.arcPaywall,
@@ -204,6 +215,20 @@ export default function PaywallPage() {
 
   const depositBusy = isDepositPending || isDepositMining;
   const withdrawBusy = isWithdrawPending || isWithdrawMining;
+
+  const showDepositSuccess = useAutoHide(isDepositSuccess);
+  const showWithdrawSuccess = useAutoHide(isWithdrawSuccess);
+
+  // Publish panel auto-hides after 10s (longer — user needs to copy proxy URL)
+  const svcResultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [svcResultVisible, setSvcResultVisible] = useState(false);
+  useEffect(() => {
+    if (svcResult) {
+      setSvcResultVisible(true);
+      svcResultTimerRef.current = setTimeout(() => setSvcResultVisible(false), 10000);
+    }
+    return () => { if (svcResultTimerRef.current) clearTimeout(svcResultTimerRef.current); };
+  }, [svcResult]);
 
   function handleDeposit() {
     if (!depositAmt) return;
@@ -366,7 +391,7 @@ export default function PaywallPage() {
                     <ArrowUpRight className="h-4 w-4" />
                   </button>
 
-                  {isDepositSuccess && depositHash && (
+                  {showDepositSuccess && depositHash && (
                     <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7] space-y-2">
                       <p>Deposit confirmed. Your request credits have been added.</p>
                       <a
@@ -419,7 +444,7 @@ export default function PaywallPage() {
                     <ArrowUpRight className="h-4 w-4" />
                   </button>
 
-                  {isWithdrawSuccess && withdrawHash && (
+                  {showWithdrawSuccess && withdrawHash && (
                     <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7] space-y-2">
                       <p>Withdrawal confirmed. Funds have been returned to your wallet.</p>
                       <a
@@ -602,7 +627,7 @@ export default function PaywallPage() {
                 Register your API or AI agent here. Your backend endpoint stays private — clients discover your service in the marketplace above and pay per request, settled on-chain.
               </p>
 
-              {!svcResult ? (
+              {!svcResult || !svcResultVisible ? (
                 <div className="mt-6 grid gap-4 max-w-xl">
                   <div>
                     <Label>Service name</Label>
@@ -639,12 +664,13 @@ export default function PaywallPage() {
                       onChange={(e) => setSvcDesc(e.target.value)}
                     />
                   </div>
+                  {!isConnected && <p className="text-sm text-white/45">Connect wallet to publish.</p>}
                   <button
                     onClick={handleRegisterService}
-                    disabled={!svcName.trim() || !svcEndpoint.trim()}
+                    disabled={!isConnected || !svcName.trim() || !svcEndpoint.trim() || svcSigning}
                     className="inline-flex items-center justify-center gap-2 rounded-full bg-[#fff4ec] px-6 py-4 text-sm font-semibold text-[#291c28] transition disabled:opacity-40"
                   >
-                    Publish service
+                    {svcSigning ? "Sign in wallet…" : "Publish service"}
                     <ArrowUpRight className="h-4 w-4" />
                   </button>
                 </div>
@@ -659,8 +685,17 @@ export default function PaywallPage() {
                     </div>
                     <div className="space-y-2">
                       <p className="text-xs uppercase tracking-[0.2em] text-white/40">Proxy URL</p>
-                      <code className="block rounded-xl bg-black/30 px-4 py-2.5 text-sm text-[#ffb38a] font-mono break-all">{svcResult.proxyUrl}</code>
+                      <div className="flex items-start gap-2">
+                        <code className="flex-1 block rounded-xl bg-black/30 px-4 py-2.5 text-sm text-[#ffb38a] font-mono break-all">{svcResult.proxyUrl}</code>
+                        <button
+                          onClick={() => navigator.clipboard.writeText(svcResult.proxyUrl)}
+                          className="shrink-0 rounded-xl border border-white/12 bg-white/8 px-3 py-2.5 text-xs text-white/60 hover:text-white transition"
+                        >
+                          Copy
+                        </button>
+                      </div>
                     </div>
+                    <p className="text-xs text-white/30">This panel disappears in 10 seconds — copy your proxy URL now.</p>
                   </div>
                   <button
                     onClick={() => { setSvcResult(null); setSvcName(""); setSvcEndpoint(""); setSvcPrice("0.001"); setSvcDesc(""); }}

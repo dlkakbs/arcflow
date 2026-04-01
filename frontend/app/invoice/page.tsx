@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useAccount, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useAutoHide } from "@/lib/useAutoHide";
 import { decodeEventLog, parseUnits } from "viem";
 import { CONTRACTS } from "@/lib/wagmi";
 import { ArrowUpRight, Sparkles } from "lucide-react";
@@ -25,6 +26,19 @@ const ABI = [
     stateMutability: "payable",
     inputs: [{ name: "id", type: "uint256" }],
     outputs: [],
+  },
+  {
+    name: "invoices",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "id", type: "uint256" }],
+    outputs: [
+      { name: "creator", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "description", type: "string" },
+      { name: "deadline", type: "uint256" },
+      { name: "paid", type: "bool" },
+    ],
   },
   {
     name: "InvoiceCreated",
@@ -85,7 +99,7 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
 }
 
 export default function InvoicePage() {
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
 
   // Separate hooks for create and pay
   const { writeContract: writeCreate, data: createHash, isPending: isCreatePending } = useWriteContract();
@@ -102,8 +116,21 @@ export default function InvoicePage() {
   const [payId, setPayId] = useState("");
   const [payAmount, setPayAmount] = useState("");
 
+  const { data: invoiceData } = useReadContract({
+    address: CONTRACTS.arcInvoice,
+    abi: ABI,
+    functionName: "invoices",
+    args: payId ? [BigInt(payId)] : undefined,
+    query: { enabled: !!payId },
+  });
+  const invoiceCreator = invoiceData ? (invoiceData as readonly [string, ...unknown[]])[0] as string : null;
+  const isSelfPay = !!(address && invoiceCreator && address.toLowerCase() === invoiceCreator.toLowerCase());
+
   const createBusy = isCreatePending || isCreateMining;
   const payBusy = isPayPending || isPayMining;
+
+  const showCreateSuccess = useAutoHide(isCreateSuccess);
+  const showPaySuccess = useAutoHide(isPaySuccess);
 
   // Extract invoice ID from receipt logs
   const invoiceId = (() => {
@@ -203,7 +230,7 @@ export default function InvoicePage() {
                     <ArrowUpRight className="h-4 w-4" />
                   </button>
 
-                  {isCreateSuccess && createHash && (
+                  {showCreateSuccess && createHash && (
                     <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7] space-y-2">
                       {invoiceId !== null ? (
                         <p>Invoice created. Your ID is <span className="font-bold text-white text-base">#{invoiceId}</span> — share it with your client to get paid.</p>
@@ -253,16 +280,22 @@ export default function InvoicePage() {
                     />
                   </div>
 
+                  {isSelfPay && (
+                    <p className="rounded-2xl border border-yellow-400/20 bg-yellow-400/8 px-4 py-3 text-sm text-yellow-300">
+                      This invoice was created by your wallet. You cannot pay your own invoice.
+                    </p>
+                  )}
+
                   <button
                     onClick={handlePay}
-                    disabled={!isConnected || payBusy || !payId || !payAmount}
+                    disabled={!isConnected || payBusy || !payId || !payAmount || isSelfPay}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/14 bg-white/8 px-6 py-4 text-sm font-semibold text-white transition disabled:opacity-40"
                   >
                     {payBusy ? "Processing..." : "Pay invoice"}
                     <ArrowUpRight className="h-4 w-4" />
                   </button>
 
-                  {isPaySuccess && payHash && (
+                  {showPaySuccess && payHash && (
                     <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7] space-y-2">
                       <p>Payment confirmed. Funds have been sent to the invoice creator.</p>
                       <a

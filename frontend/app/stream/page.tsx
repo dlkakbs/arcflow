@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useAccount, useReadContract, useReadContracts, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useAutoHide } from "@/lib/useAutoHide";
 import { decodeEventLog, formatUnits, parseUnits } from "viem";
 import { CONTRACTS } from "@/lib/wagmi";
 import { ArrowUpRight, Sparkles, Wallet, Activity, Radio } from "lucide-react";
@@ -153,8 +154,12 @@ export default function StreamPage() {
   const { isLoading: isWithdrawMining, isSuccess: isWithdrawSuccess } = useWaitForTransactionReceipt({ hash: withdrawHash });
 
   const { writeContract: writeCancel, data: cancelHash, isPending: isCancelPending } = useWriteContract();
-  const { isLoading: isCancelMining } = useWaitForTransactionReceipt({ hash: cancelHash });
+  const { isLoading: isCancelMining, isSuccess: isCancelSuccess } = useWaitForTransactionReceipt({ hash: cancelHash });
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+
+  const showCreateSuccess = useAutoHide(isSuccess);
+  const showWithdrawSuccess = useAutoHide(isWithdrawSuccess);
+  const showCancelSuccess = useAutoHide(isCancelSuccess);
 
   const [recipient, setRecipient] = useState("");
   const [monthly, setMonthly] = useState("");
@@ -405,7 +410,7 @@ export default function StreamPage() {
                       {busy ? "Processing..." : "Create stream"}
                       <ArrowUpRight className="h-4 w-4" />
                     </button>
-                    {isSuccess && (
+                    {showCreateSuccess && (
                       <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7] space-y-2">
                         {streamId !== null ? (
                           <p>Stream created. Share ID <span className="font-bold text-white text-base">#{streamId.toString()}</span> with your recipient so they can track and withdraw their balance.</p>
@@ -451,8 +456,7 @@ export default function StreamPage() {
             </GlassCard>
           </Reveal>
 
-          {/* Live stream status — only for recipients (no active outgoing streams) */}
-          {(!isConnected || activeMyStreams.length === 0) && (
+          {/* Live stream status — always visible */}
           <Reveal>
             <GlassCard className="overflow-hidden">
               <div className="border-b border-white/10 p-7 md:p-8">
@@ -527,7 +531,7 @@ export default function StreamPage() {
                       {isWithdrawPending || isWithdrawMining ? "Withdrawing..." : "Withdraw now"}
                       <ArrowUpRight className="h-4 w-4" />
                     </button>
-                    {isWithdrawSuccess && withdrawHash && (
+                    {showWithdrawSuccess && withdrawHash && (
                       <a
                         href={`https://testnet.arcscan.app/tx/${withdrawHash}`}
                         target="_blank"
@@ -588,7 +592,6 @@ export default function StreamPage() {
               </div>
             </GlassCard>
           </Reveal>
-          )}
 
           {/* Active streams */}
           {isConnected && activeMyStreams.length > 0 && (
@@ -673,6 +676,9 @@ export default function StreamPage() {
                             >
                               {isCancelling ? "Cancelling…" : "Cancel"}
                             </button>
+                            {showCancelSuccess && cancellingId === s.id && (
+                              <p className="mt-1 text-xs text-white/45">Stream cancelled. Unspent deposit returned.</p>
+                            )}
                           </div>
                         </div>
                       );
