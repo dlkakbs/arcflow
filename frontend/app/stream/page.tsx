@@ -159,17 +159,17 @@ export default function StreamPage() {
 
   const showCreateSuccess = useAutoHide(isSuccess, 12000);
   const showWithdrawSuccess = useAutoHide(isWithdrawSuccess);
+  // cancelledStreamIds: IDs added immediately on click (keeps row visible during mining)
+  // cancelSuccessIds: IDs added on tx success (shows feedback message)
   const [cancelledStreamIds, setCancelledStreamIds] = useState<Set<number>>(new Set());
+  const [cancelSuccessIds, setCancelSuccessIds] = useState<Set<number>>(new Set());
   useEffect(() => {
     if (isCancelSuccess && cancellingId !== null) {
       const id = cancellingId;
-      setCancelledStreamIds(prev => new Set(prev).add(id));
+      setCancelSuccessIds(prev => new Set(prev).add(id));
       const t = setTimeout(() => {
-        setCancelledStreamIds(prev => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
+        setCancelledStreamIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+        setCancelSuccessIds(prev => { const n = new Set(prev); n.delete(id); return n; });
       }, 6000);
       return () => clearTimeout(t);
     }
@@ -280,10 +280,11 @@ export default function StreamPage() {
   }, [allStreamsRaw, allWithdrawableRaw, address]);
 
   const activeMyStreams = myStreams.filter((s) => s.active);
-  // Recently cancelled streams still shown briefly for inline feedback
+  // visibleStreams: active streams + any stream in cancelledStreamIds (kept visible until timer expires)
   const visibleStreams = useMemo(() => {
-    const recentlyCancelled = myStreams.filter(s => cancelledStreamIds.has(s.id) && !s.active);
-    return [...activeMyStreams, ...recentlyCancelled];
+    const cancelledVisible = myStreams.filter(s => cancelledStreamIds.has(s.id));
+    const activeNotCancelled = activeMyStreams.filter(s => !cancelledStreamIds.has(s.id));
+    return [...activeNotCancelled, ...cancelledVisible];
   }, [activeMyStreams, myStreams, cancelledStreamIds]);
   // If user has ever sent a stream (active or cancelled), hide the recipient lookup
   const hasEverSentStream = myStreams.length > 0;
@@ -425,10 +426,10 @@ export default function StreamPage() {
                     </div>
                     <button
                       onClick={handleCreate}
-                      disabled={!isConnected || busy || !recipient || !monthly || !deposit}
+                      disabled={!isConnected || busy || !recipient || !monthly || !deposit || !rate}
                       className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#fff4ec] px-6 py-4 text-sm font-semibold text-[#291c28] transition disabled:opacity-40"
                     >
-                      {busy ? "Processing..." : "Create stream"}
+                      {busy ? "Processing..." : (monthly && !rate) ? "Calculating rate…" : "Create stream"}
                       <ArrowUpRight className="h-4 w-4" />
                     </button>
                     {showCreateSuccess && (
@@ -655,6 +656,7 @@ export default function StreamPage() {
                     {visibleStreams.map((s) => {
                       const isCancelling = cancellingId === s.id && (isCancelPending || isCancelMining);
                       const isCancelled = cancelledStreamIds.has(s.id);
+                      const showCancelFeedback = cancelSuccessIds.has(s.id);
                       return (
                         <div key={s.id} className="space-y-2">
                           <div
@@ -693,6 +695,7 @@ export default function StreamPage() {
                                 <button
                                   onClick={() => {
                                     setCancellingId(s.id);
+                                    setCancelledStreamIds(prev => new Set(prev).add(s.id));
                                     writeCancel({
                                       address: CONTRACTS.arcFlow,
                                       abi: ABI,
@@ -708,7 +711,7 @@ export default function StreamPage() {
                               )}
                             </div>
                           </div>
-                          {isCancelled && (
+                          {showCancelFeedback && (
                             <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 px-4 py-3 text-sm text-[#ffd7c7]">
                               Stream #{s.id} cancelled. Unspent deposit returned to your wallet.
                             </div>
