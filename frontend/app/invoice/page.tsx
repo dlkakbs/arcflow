@@ -233,6 +233,11 @@ export default function InvoicePage() {
                 </div>
 
                 <div className="space-y-5 p-7 md:p-8">
+                  {!payId && (
+                    <p className="text-sm text-white/40 leading-6">
+                      If someone sent you an invoice, enter the invoice ID here to view and pay it. The creator receives the invoice ID right after creating it — ask them to share it with you.
+                    </p>
+                  )}
                   <div>
                     <Label>Invoice ID</Label>
                     <Input type="number" placeholder="0" value={payId} onChange={(e) => setPayId(e.target.value)} />

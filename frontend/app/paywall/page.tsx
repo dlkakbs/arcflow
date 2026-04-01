@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract, useSignMessage } from "wagmi";
 import { formatUnits, parseUnits, keccak256, encodePacked, toBytes } from "viem";
@@ -8,7 +8,7 @@ import { CONTRACTS } from "@/lib/wagmi";
 import { PAYWALL_ADDRESS } from "@/lib/arcChain";
 
 const ARC_CHAIN_ID = 5042002;
-import { ArrowUpRight, Sparkles, Wallet, Gauge, Coins, Zap } from "lucide-react";
+import { ArrowUpRight, Sparkles, Wallet, Gauge, Coins, Zap, Code2 } from "lucide-react";
 
 const ABI = [
   {
@@ -121,6 +121,22 @@ export default function PaywallPage() {
   const [prompt, setPrompt] = useState("");
   const [apiResult, setApiResult] = useState<null | { success?: boolean; response?: { message: string; model: string; timestamp: string }; creditsUsed?: number; creditsRemaining?: string; error?: string }>(null);
   const [apiLoading, setApiLoading] = useState(false);
+
+  // Service registration state
+  const [svcName, setSvcName] = useState("");
+  const [svcEndpoint, setSvcEndpoint] = useState("");
+  const [svcPrice, setSvcPrice] = useState("0.001");
+  const [svcDesc, setSvcDesc] = useState("");
+  const [svcResult, setSvcResult] = useState<null | { serviceId: string; proxyUrl: string }>(null);
+
+  const handleRegisterService = useCallback(() => {
+    if (!svcName.trim() || !svcEndpoint.trim()) return;
+    const serviceId = `svc_${Date.now().toString(36)}`;
+    const proxyUrl = `https://flowonarc.vercel.app/api/proxy?service=${serviceId}`;
+    const entry = { serviceId, name: svcName, endpoint: svcEndpoint, price: svcPrice, desc: svcDesc, proxyUrl };
+    try { localStorage.setItem(`arcflow_service_${serviceId}`, JSON.stringify(entry)); } catch { /* ignore */ }
+    setSvcResult({ serviceId, proxyUrl });
+  }, [svcName, svcEndpoint, svcPrice, svcDesc]);
 
   const { data: balance } = useReadContract({
     address: CONTRACTS.arcPaywall,
@@ -451,6 +467,99 @@ export default function PaywallPage() {
                       </div>
                     </>
                   )}
+                </div>
+              )}
+            </div>
+          </GlassCard>
+        </Reveal>
+
+        {/* Register your service */}
+        <Reveal>
+          <GlassCard className="mt-6 overflow-hidden">
+            <div className="border-b border-white/10 p-7 md:p-8">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl border border-white/12 bg-black/20 p-3">
+                  <Code2 className="h-5 w-5 text-[#ffb38a]" />
+                </div>
+                <div>
+                  <p className="text-sm uppercase tracking-[0.24em] text-white/50">For service providers</p>
+                  <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Publish your API or agent</h2>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-7 md:p-8">
+              <p className="max-w-xl text-sm leading-7 text-white/60">
+                Register your API or AI agent here. Clients will fund their ArcFlow balance and send requests through your service endpoint — you get paid per call, settled on-chain.
+              </p>
+
+              {!svcResult ? (
+                <div className="mt-6 grid gap-4 max-w-xl">
+                  <div>
+                    <Label>Service name</Label>
+                    <Input
+                      placeholder="My AI Image API"
+                      value={svcName}
+                      onChange={(e) => setSvcName(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Endpoint URL</Label>
+                    <Input
+                      placeholder="https://api.yourservice.com/v1/generate"
+                      value={svcEndpoint}
+                      onChange={(e) => setSvcEndpoint(e.target.value)}
+                    />
+                    <p className="mt-2 text-xs text-white/35">ArcFlow proxies client requests to this URL after verifying on-chain balance.</p>
+                  </div>
+                  <div>
+                    <Label>Price per request (USDC)</Label>
+                    <Input
+                      type="number"
+                      placeholder="0.001"
+                      step="0.0001"
+                      value={svcPrice}
+                      onChange={(e) => setSvcPrice(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Description (optional)</Label>
+                    <Input
+                      placeholder="One-line description of what your service does"
+                      value={svcDesc}
+                      onChange={(e) => setSvcDesc(e.target.value)}
+                    />
+                  </div>
+                  <button
+                    onClick={handleRegisterService}
+                    disabled={!svcName.trim() || !svcEndpoint.trim()}
+                    className="inline-flex items-center justify-center gap-2 rounded-full bg-[#fff4ec] px-6 py-4 text-sm font-semibold text-[#291c28] transition disabled:opacity-40"
+                  >
+                    Publish service
+                    <ArrowUpRight className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-6 max-w-xl space-y-4">
+                  <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-5 text-sm text-[#ffd7c7] space-y-3">
+                    <p className="font-semibold text-white">Your service is registered.</p>
+                    <p className="text-white/60">Clients can reach your service through the ArcFlow proxy. Share the URL below — every request is metered and settled on-chain.</p>
+                    <div className="space-y-2">
+                      <p className="text-xs uppercase tracking-[0.2em] text-white/40">Service ID</p>
+                      <code className="block rounded-xl bg-black/30 px-4 py-2.5 text-sm text-white font-mono">{svcResult.serviceId}</code>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs uppercase tracking-[0.2em] text-white/40">Proxy URL (share with clients)</p>
+                      <code className="block rounded-xl bg-black/30 px-4 py-2.5 text-sm text-[#ffb38a] font-mono break-all">{svcResult.proxyUrl}</code>
+                    </div>
+                    <p className="text-xs text-white/35">Clients send requests here with their wallet address. ArcFlow verifies their balance, forwards to your endpoint, and queues the payment.</p>
+                  </div>
+                  <button
+                    onClick={() => { setSvcResult(null); setSvcName(""); setSvcEndpoint(""); setSvcPrice("0.001"); setSvcDesc(""); }}
+                    className="text-sm text-white/40 underline underline-offset-2 hover:text-white/60 transition"
+                  >
+                    Register another service
+                  </button>
                 </div>
               )}
             </div>
