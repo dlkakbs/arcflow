@@ -145,23 +145,23 @@ export default function HomePage() {
 
             <Reveal>
               <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
+                <Link
+                  href="/how-to-work"
+                  className="group inline-flex items-center justify-center gap-2 rounded-full bg-[#fff4ec] px-7 py-3.5 text-sm font-semibold text-[#291c28] transition-transform hover:-translate-y-0.5"
+                >
+                  Explore Flow
+                  <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </Link>
+
                 <a
                   href="https://www.arc.network/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group inline-flex items-center justify-center gap-2 rounded-full bg-[#fff4ec] px-7 py-3.5 text-sm font-semibold text-[#291c28] transition-transform hover:-translate-y-0.5"
-                >
-                  Explore Arc
-                  <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                </a>
-
-                <Link
-                  href="/how-to-work"
                   className="inline-flex items-center justify-center gap-2 rounded-full border border-white/14 bg-white/8 px-7 py-3.5 text-sm font-medium text-white/90 backdrop-blur-md hover:bg-white/12"
                 >
-                  Explore flows
+                  Explore Arc
                   <ArrowUpRight className="h-4 w-4" />
-                </Link>
+                </a>
 
               </div>
             </Reveal>

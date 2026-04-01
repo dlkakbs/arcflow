@@ -180,13 +180,6 @@ export default function HowToWorkPage() {
                       <p className="mt-5 max-w-2xl text-base leading-8 text-white/72">{m.what}</p>
                     </div>
 
-                    <Link
-                      href={m.href}
-                      className="inline-flex items-center justify-center gap-2 rounded-full border border-white/14 bg-white/8 px-5 py-3 text-sm font-medium text-white"
-                    >
-                      Try it
-                      <ArrowUpRight className="h-4 w-4" />
-                    </Link>
                   </div>
 
                   <div className="mt-8">
