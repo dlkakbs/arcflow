@@ -66,22 +66,6 @@ const DEMO_SERVICES: ServiceEntry[] = [
     proxyUrl: "https://flowonarc.vercel.app/api/request",
     demo: true,
   },
-  {
-    serviceId: "svc_demo_img",
-    name: "Image Generator",
-    desc: "Text-to-image generation via Stable Diffusion. High-res output, no subscription.",
-    price: "0.005",
-    proxyUrl: "https://flowonarc.vercel.app/api/proxy?service=svc_demo_img",
-    demo: true,
-  },
-  {
-    serviceId: "svc_demo_code",
-    name: "Code Review Agent",
-    desc: "Automated PR analysis and improvement suggestions. Integrates with any git workflow.",
-    price: "0.002",
-    proxyUrl: "https://flowonarc.vercel.app/api/proxy?service=svc_demo_code",
-    demo: true,
-  },
 ];
 
 const reveal = {
@@ -486,13 +470,7 @@ export default function PaywallPage() {
               <div className="mt-6 space-y-3 max-w-xl">
                 <textarea
                   rows={3}
-                  placeholder={
-                    selectedServiceId === "svc_demo_img"
-                      ? "Describe the image you want to generate..."
-                      : selectedServiceId === "svc_demo_code"
-                      ? "Paste your code or describe what you want reviewed..."
-                      : "Ask anything — crypto, coding, payments, general knowledge..."
-                  }
+                  placeholder="Ask anything — crypto, coding, payments, general knowledge..."
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={(e) => {

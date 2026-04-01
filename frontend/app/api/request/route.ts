@@ -56,21 +56,7 @@ function getArcAiResponse(prompt: string): string {
   return `You asked: "${prompt.length > 80 ? prompt.slice(0, 80) + '…' : prompt}". I'm the Arc AI Assistant — a general-purpose agent running on ArcFlow's per-request payment infrastructure. I can help with crypto, smart contracts, coding, payments, and more. Try asking something specific!`
 }
 
-function getImageGenResponse(prompt: string): string {
-  return `Image generation request received for: "${prompt.length > 60 ? prompt.slice(0, 60) + '…' : prompt}". In production this would return a generated image URL. This demo service is coming in v2 — the payment flow (deposit → sign → settle) works exactly the same as Arc AI Assistant.`
-}
-
-function getCodeReviewResponse(prompt: string): string {
-  const q = prompt.toLowerCase()
-  if (q.includes('function') || q.includes('def ') || q.includes('const ') || q.includes('class ')) {
-    return `Code review complete. Observations: (1) Consider adding explicit return types for clarity. (2) Extract magic numbers into named constants. (3) Add input validation at the function boundary. (4) The logic looks sound — no obvious security issues detected. Payment deducted: 0.002 USDC.`
-  }
-  return `Code Review Agent ready. Paste a function, class, or describe what you'd like reviewed — I'll check for logic errors, security issues, and style improvements. Each review costs 0.002 USDC, settled on-chain via ArcFlow.`
-}
-
-function getDemoResponse(prompt: string, serviceId?: string): string {
-  if (serviceId === 'svc_demo_img')  return getImageGenResponse(prompt)
-  if (serviceId === 'svc_demo_code') return getCodeReviewResponse(prompt)
+function getDemoResponse(prompt: string): string {
   return getArcAiResponse(prompt)
 }
 
@@ -156,8 +142,8 @@ export async function POST(req: NextRequest) {
   const result = {
     success: true,
     response: {
-      message:   getDemoResponse(prompt ?? '', serviceId),
-      model:     serviceId === 'svc_demo_img' ? 'arc-image-gen-v1' : serviceId === 'svc_demo_code' ? 'arc-code-review-v1' : 'arc-ai-assistant-v1',
+      message:   getDemoResponse(prompt ?? ''),
+      model:     'arc-ai-assistant-v1',
       timestamp: new Date().toISOString(),
     },
     creditsUsed:      1,
