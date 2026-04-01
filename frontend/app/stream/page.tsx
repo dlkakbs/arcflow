@@ -152,6 +152,10 @@ export default function StreamPage() {
   const { writeContract: writeWithdraw, data: withdrawHash, isPending: isWithdrawPending } = useWriteContract();
   const { isLoading: isWithdrawMining, isSuccess: isWithdrawSuccess } = useWaitForTransactionReceipt({ hash: withdrawHash });
 
+  const { writeContract: writeCancel, data: cancelHash, isPending: isCancelPending } = useWriteContract();
+  const { isLoading: isCancelMining } = useWaitForTransactionReceipt({ hash: cancelHash });
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
+
   const [recipient, setRecipient] = useState("");
   const [monthly, setMonthly] = useState("");
   const [deposit, setDeposit] = useState("");
@@ -615,43 +619,64 @@ export default function StreamPage() {
 
                 <div className="p-7 md:p-8">
                   {/* Header row */}
-                  <div className="mb-3 hidden grid-cols-[2fr_1.5fr_1.5fr_80px] gap-4 px-4 text-xs uppercase tracking-[0.2em] text-white/35 md:grid">
+                  <div className="mb-3 hidden grid-cols-[2fr_1.5fr_1.5fr_80px_100px] gap-4 px-4 text-xs uppercase tracking-[0.2em] text-white/35 md:grid">
                     <span>Recipient</span>
                     <span>Monthly</span>
                     <span>Withdrawable</span>
                     <span>Status</span>
+                    <span></span>
                   </div>
 
                   <div className="space-y-3">
-                    {activeMyStreams.map((s) => (
-                      <div
-                        key={s.id}
-                        className="grid grid-cols-1 gap-3 rounded-2xl border border-white/8 bg-black/15 p-4 md:grid-cols-[2fr_1.5fr_1.5fr_80px] md:items-center md:gap-4"
-                      >
-                        <div>
-                          <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Recipient</p>
-                          <span className="font-mono text-sm text-white">{shortAddr(s.recipient)}</span>
-                        </div>
-                        <div>
-                          <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Monthly</p>
-                          <span className="text-sm text-white">
-                            {(Number(formatUnits(s.rate, 6)) * 2_592_000).toFixed(2)} USDC
-                          </span>
-                        </div>
-                        <div>
-                          <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Withdrawable</p>
-                          <span className="text-sm font-medium text-[#ffb38a]">
-                            {Number(formatUnits(s.withdrawable, 6)).toFixed(4)} USDC
-                          </span>
-                        </div>
-                        <div>
-                          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            Live
+                    {activeMyStreams.map((s) => {
+                      const isCancelling = cancellingId === s.id && (isCancelPending || isCancelMining);
+                      return (
+                        <div
+                          key={s.id}
+                          className="grid grid-cols-1 gap-3 rounded-2xl border border-white/8 bg-black/15 p-4 md:grid-cols-[2fr_1.5fr_1.5fr_80px_100px] md:items-center md:gap-4"
+                        >
+                          <div>
+                            <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Recipient</p>
+                            <span className="font-mono text-sm text-white">{shortAddr(s.recipient)}</span>
+                          </div>
+                          <div>
+                            <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Monthly</p>
+                            <span className="text-sm text-white">
+                              {(Number(formatUnits(s.rate, 6)) * 2_592_000).toFixed(2)} USDC
+                            </span>
+                          </div>
+                          <div>
+                            <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Withdrawable</p>
+                            <span className="text-sm font-medium text-[#ffb38a]">
+                              {Number(formatUnits(s.withdrawable, 6)).toFixed(4)} USDC
+                            </span>
+                          </div>
+                          <div>
+                            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                              Live
+                            </div>
+                          </div>
+                          <div>
+                            <button
+                              onClick={() => {
+                                setCancellingId(s.id);
+                                writeCancel({
+                                  address: CONTRACTS.arcFlow,
+                                  abi: ABI,
+                                  functionName: "cancelStream",
+                                  args: [BigInt(s.id)],
+                                });
+                              }}
+                              disabled={isCancelling}
+                              className="inline-flex items-center justify-center rounded-full border border-red-400/20 bg-red-400/8 px-3 py-1.5 text-xs font-medium text-red-300 transition hover:bg-red-400/15 disabled:opacity-40"
+                            >
+                              {isCancelling ? "Cancelling…" : "Cancel"}
+                            </button>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </GlassCard>

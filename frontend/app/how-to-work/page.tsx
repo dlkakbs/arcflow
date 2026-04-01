@@ -23,7 +23,7 @@ const MODULES = [
           "Enter recipient wallet address and monthly USDC amount",
           "Set an initial deposit to define how long the stream runs",
           "Create the stream — funds begin accruing per second immediately",
-          "Cancel anytime; unspent deposit is returned to your wallet",
+          "Cancel anytime via the active streams panel; unspent deposit is returned to your wallet",
         ],
       },
       {
@@ -232,12 +232,22 @@ export default function HowToWorkPage() {
         </section>
 
         <section className="mt-8">
-          <div className="flex flex-col gap-4 rounded-[2rem] border border-white/12 bg-white/8 p-7 backdrop-blur-xl md:flex-row md:items-center md:justify-between md:p-8">
+          <div className="flex flex-col gap-6 rounded-[2rem] border border-white/12 bg-white/8 p-7 backdrop-blur-xl md:flex-row md:items-center md:justify-between md:p-8">
             <div>
               <h3 className="text-2xl font-semibold tracking-[-0.03em]">Ready to try it?</h3>
               <p className="mt-2 text-base text-white/65">Start with stream, invoice, or paywall and test the flow on Arc.</p>
             </div>
-
+            <div className="flex flex-wrap gap-3">
+              <Link href="/stream" className="inline-flex items-center gap-1.5 rounded-full border border-white/14 bg-white/8 px-5 py-2.5 text-sm font-medium text-white hover:bg-white/12 transition">
+                Stream <ArrowUpRight className="h-3.5 w-3.5" />
+              </Link>
+              <Link href="/invoice" className="inline-flex items-center gap-1.5 rounded-full border border-white/14 bg-white/8 px-5 py-2.5 text-sm font-medium text-white hover:bg-white/12 transition">
+                Invoice <ArrowUpRight className="h-3.5 w-3.5" />
+              </Link>
+              <Link href="/paywall" className="inline-flex items-center gap-1.5 rounded-full border border-white/14 bg-white/8 px-5 py-2.5 text-sm font-medium text-white hover:bg-white/12 transition">
+                Paywall <ArrowUpRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
           </div>
         </section>
       </main>
