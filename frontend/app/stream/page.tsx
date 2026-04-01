@@ -157,14 +157,20 @@ export default function StreamPage() {
   const { isLoading: isCancelMining, isSuccess: isCancelSuccess } = useWaitForTransactionReceipt({ hash: cancelHash });
   const [cancellingId, setCancellingId] = useState<number | null>(null);
 
-  const showCreateSuccess = useAutoHide(isSuccess);
+  const showCreateSuccess = useAutoHide(isSuccess, 12000);
   const showWithdrawSuccess = useAutoHide(isWithdrawSuccess);
-  const showCancelSuccess = useAutoHide(isCancelSuccess);
-  const [cancelBanner, setCancelBanner] = useState<string | null>(null);
+  const [cancelledStreamIds, setCancelledStreamIds] = useState<Set<number>>(new Set());
   useEffect(() => {
     if (isCancelSuccess && cancellingId !== null) {
-      setCancelBanner(`Stream #${cancellingId} cancelled. Unspent deposit returned to your wallet.`);
-      const t = setTimeout(() => setCancelBanner(null), 5000);
+      const id = cancellingId;
+      setCancelledStreamIds(prev => new Set(prev).add(id));
+      const t = setTimeout(() => {
+        setCancelledStreamIds(prev => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }, 6000);
       return () => clearTimeout(t);
     }
   }, [isCancelSuccess, cancellingId]);
@@ -274,6 +280,11 @@ export default function StreamPage() {
   }, [allStreamsRaw, allWithdrawableRaw, address]);
 
   const activeMyStreams = myStreams.filter((s) => s.active);
+  // Recently cancelled streams still shown briefly for inline feedback
+  const visibleStreams = useMemo(() => {
+    const recentlyCancelled = myStreams.filter(s => cancelledStreamIds.has(s.id) && !s.active);
+    return [...activeMyStreams, ...recentlyCancelled];
+  }, [activeMyStreams, myStreams, cancelledStreamIds]);
   // If user has ever sent a stream (active or cancelled), hide the recipient lookup
   const hasEverSentStream = myStreams.length > 0;
 
@@ -466,15 +477,6 @@ export default function StreamPage() {
             </GlassCard>
           </Reveal>
 
-          {/* Cancel success banner — outside stream rows so it survives row removal */}
-          {cancelBanner && (
-            <Reveal>
-              <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 px-5 py-4 text-sm text-[#ffd7c7]">
-                {cancelBanner}
-              </div>
-            </Reveal>
-          )}
-
           {/* Live stream status — only for non-senders */}
           {!hasEverSentStream && <Reveal>
             <GlassCard className="overflow-hidden">
@@ -613,7 +615,7 @@ export default function StreamPage() {
           </Reveal>}
 
           {/* Active streams */}
-          {isConnected && activeMyStreams.length > 0 && (
+          {isConnected && visibleStreams.length > 0 && (
             <Reveal>
               <GlassCard className="overflow-hidden">
                 <div className="border-b border-white/10 p-7 md:p-8">
@@ -650,52 +652,67 @@ export default function StreamPage() {
                   </div>
 
                   <div className="space-y-3">
-                    {activeMyStreams.map((s) => {
+                    {visibleStreams.map((s) => {
                       const isCancelling = cancellingId === s.id && (isCancelPending || isCancelMining);
+                      const isCancelled = cancelledStreamIds.has(s.id);
                       return (
-                        <div
-                          key={s.id}
-                          className="grid grid-cols-1 gap-3 rounded-2xl border border-white/8 bg-black/15 p-4 md:grid-cols-[2fr_1.5fr_1.5fr_80px_100px] md:items-center md:gap-4"
-                        >
-                          <div>
-                            <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Recipient</p>
-                            <span className="font-mono text-sm text-white">{shortAddr(s.recipient)}</span>
-                          </div>
-                          <div>
-                            <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Monthly</p>
-                            <span className="text-sm text-white">
-                              {(Number(formatUnits(s.rate, 6)) * 2_592_000).toFixed(2)} USDC
-                            </span>
-                          </div>
-                          <div>
-                            <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Withdrawable</p>
-                            <span className="text-sm font-medium text-[#ffb38a]">
-                              {Number(formatUnits(s.withdrawable, 6)).toFixed(4)} USDC
-                            </span>
-                          </div>
-                          <div>
-                            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300">
-                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                              Live
+                        <div key={s.id} className="space-y-2">
+                          <div
+                            className="grid grid-cols-1 gap-3 rounded-2xl border border-white/8 bg-black/15 p-4 md:grid-cols-[2fr_1.5fr_1.5fr_80px_100px] md:items-center md:gap-4"
+                          >
+                            <div>
+                              <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Recipient</p>
+                              <span className="font-mono text-sm text-white">{shortAddr(s.recipient)}</span>
+                            </div>
+                            <div>
+                              <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Monthly</p>
+                              <span className="text-sm text-white">
+                                {(Number(formatUnits(s.rate, 6)) * 2_592_000).toFixed(2)} USDC
+                              </span>
+                            </div>
+                            <div>
+                              <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Withdrawable</p>
+                              <span className="text-sm font-medium text-[#ffb38a]">
+                                {Number(formatUnits(s.withdrawable, 6)).toFixed(4)} USDC
+                              </span>
+                            </div>
+                            <div>
+                              {isCancelled ? (
+                                <div className="inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/8 px-3 py-1 text-xs text-white/45">
+                                  Cancelled
+                                </div>
+                              ) : (
+                                <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                  Live
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              {!isCancelled && (
+                                <button
+                                  onClick={() => {
+                                    setCancellingId(s.id);
+                                    writeCancel({
+                                      address: CONTRACTS.arcFlow,
+                                      abi: ABI,
+                                      functionName: "cancelStream",
+                                      args: [BigInt(s.id)],
+                                    });
+                                  }}
+                                  disabled={isCancelling}
+                                  className="inline-flex items-center justify-center rounded-full border border-red-400/20 bg-red-400/8 px-3 py-1.5 text-xs font-medium text-red-300 transition hover:bg-red-400/15 disabled:opacity-40"
+                                >
+                                  {isCancelling ? "Cancelling…" : "Cancel"}
+                                </button>
+                              )}
                             </div>
                           </div>
-                          <div>
-                            <button
-                              onClick={() => {
-                                setCancellingId(s.id);
-                                writeCancel({
-                                  address: CONTRACTS.arcFlow,
-                                  abi: ABI,
-                                  functionName: "cancelStream",
-                                  args: [BigInt(s.id)],
-                                });
-                              }}
-                              disabled={isCancelling}
-                              className="inline-flex items-center justify-center rounded-full border border-red-400/20 bg-red-400/8 px-3 py-1.5 text-xs font-medium text-red-300 transition hover:bg-red-400/15 disabled:opacity-40"
-                            >
-                              {isCancelling ? "Cancelling…" : "Cancel"}
-                            </button>
-                          </div>
+                          {isCancelled && (
+                            <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 px-4 py-3 text-sm text-[#ffd7c7]">
+                              Stream #{s.id} cancelled. Unspent deposit returned to your wallet.
+                            </div>
+                          )}
                         </div>
                       );
                     })}
