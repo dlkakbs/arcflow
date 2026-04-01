@@ -305,6 +305,9 @@ export default function PaywallPage() {
             <p className="mx-auto mt-8 max-w-2xl text-lg leading-8 text-white/68 md:text-[21px]">
               Deposit once, consume request credits over time, and pay only for actual usage instead of bloated subscriptions.
             </p>
+            <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-white/40">
+              Building an API or AI agent? Publish your service below — clients discover it here and pay per request, settled on-chain with no intermediary.
+            </p>
           </div>
         </Reveal>
 
