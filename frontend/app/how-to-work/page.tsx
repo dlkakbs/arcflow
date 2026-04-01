@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Sparkles, Waves, Receipt, LockKeyhole, ArrowUpRight, Code2 } from "lucide-react";
+import { Sparkles, Waves, Receipt, LockKeyhole, ArrowUpRight, Code2, Send, Download } from "lucide-react";
 
 const MODULES = [
   {
@@ -15,6 +15,28 @@ const MODULES = [
     icon: Waves,
     accent: "text-[#ffb38a]",
     glow: "from-[#ffb38a]/25 via-white/5 to-transparent",
+    roles: [
+      {
+        icon: Send,
+        label: "Sender (payer)",
+        steps: [
+          "Enter recipient wallet address and monthly USDC amount",
+          "Set an initial deposit to define how long the stream runs",
+          "Create the stream — funds begin accruing per second immediately",
+          "Cancel anytime; unspent deposit is returned to your wallet",
+        ],
+      },
+      {
+        icon: Download,
+        label: "Recipient",
+        steps: [
+          "Receive the stream ID from the sender",
+          "Enter the ID in the Stream lookup to see your live balance",
+          "Watch USDC accrue in real time every second",
+          "Withdraw your earned balance whenever you want — no waiting",
+        ],
+      },
+    ],
   },
   {
     href: "/invoice",
@@ -29,6 +51,28 @@ const MODULES = [
     icon: Receipt,
     accent: "text-[#ffd7c7]",
     glow: "from-[#ffd7c7]/30 via-white/5 to-transparent",
+    roles: [
+      {
+        icon: Receipt,
+        label: "Invoice creator",
+        steps: [
+          "Set the USDC amount, description, and optional deadline",
+          "Create the invoice — a unique numeric ID is generated on-chain",
+          "Share the invoice ID with your client",
+          "Funds arrive directly in your wallet once the client pays",
+        ],
+      },
+      {
+        icon: Download,
+        label: "Payer (client)",
+        steps: [
+          "Receive the invoice ID from the creator",
+          "Enter the ID and the amount in the Pay invoice form",
+          "Confirm the transaction — payment settles on-chain instantly",
+          "Both parties can verify the transaction on ArcScan",
+        ],
+      },
+    ],
   },
   {
     href: "/paywall",
