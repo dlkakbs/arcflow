@@ -287,9 +287,6 @@ export default function StreamPage() {
     const activeNotCancelled = activeMyStreams.filter(s => !cancelledStreamIds.has(s.id));
     return [...activeNotCancelled, ...cancelledVisible];
   }, [activeMyStreams, myStreams, cancelledStreamIds]);
-  // If user has ever sent a stream (active or cancelled), hide the recipient lookup
-  const hasEverSentStream = myStreams.length > 0;
-
   const totalMonthlyOut = activeMyStreams.reduce((acc, s) => acc + Number(formatNativeUsdc(s.rate)) * 2_592_000, 0);
   const totalDeposited = activeMyStreams.reduce((acc, s) => acc + Number(formatNativeUsdc(s.deposit)), 0);
 
@@ -479,8 +476,8 @@ export default function StreamPage() {
             </GlassCard>
           </Reveal>
 
-          {/* Live stream status — only for non-senders */}
-          {!hasEverSentStream && <Reveal>
+          {/* Stream lookup */}
+          <Reveal>
             <GlassCard className="overflow-hidden">
               <div className="border-b border-white/10 p-7 md:p-8">
                 <div className="flex items-center justify-between gap-4">
@@ -490,7 +487,7 @@ export default function StreamPage() {
                     </div>
                     <div>
                       <p className="text-sm uppercase tracking-[0.24em] text-white/50">Stream lookup</p>
-                      <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Check your incoming stream</h2>
+                      <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Check any stream by ID</h2>
                     </div>
                   </div>
                   {streamArr?.[6] && (
@@ -529,7 +526,7 @@ export default function StreamPage() {
                 </div>
 
                 {!activeId && (
-                  <p className="text-sm text-white/40">If someone is streaming USDC to you, enter the stream ID here to see your withdrawable balance and stream details.</p>
+                  <p className="text-sm text-white/40">Enter a stream ID to inspect its status. If you are the recipient, you can withdraw the accrued balance here.</p>
                 )}
 
                 {activeId !== null && !streamArr && (
@@ -614,7 +611,7 @@ export default function StreamPage() {
                 )}
               </div>
             </GlassCard>
-          </Reveal>}
+          </Reveal>
 
           {/* Active streams */}
           {isConnected && visibleStreams.length > 0 && (
