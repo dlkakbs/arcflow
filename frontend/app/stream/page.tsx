@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useAccount, useReadContract, useReadContracts, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { useAutoHide } from "@/lib/useAutoHide";
-import { decodeEventLog, formatUnits, parseUnits } from "viem";
+import { decodeEventLog } from "viem";
 import { CONTRACTS } from "@/lib/wagmi";
+import { formatNativeUsdc, parseNativeUsdc } from "@/lib/nativeUsdc";
 import { ArrowUpRight, Sparkles, Wallet, Activity, Radio } from "lucide-react";
 
 const ABI = [
@@ -193,7 +194,7 @@ export default function StreamPage() {
     address: CONTRACTS.arcFlow,
     abi: ABI,
     functionName: "monthlyToRate",
-    args: monthly ? [parseUnits(monthly, 6)] : undefined,
+    args: monthly ? [parseNativeUsdc(monthly)] : undefined,
     query: { enabled: !!monthly },
   });
 
@@ -289,8 +290,8 @@ export default function StreamPage() {
   // If user has ever sent a stream (active or cancelled), hide the recipient lookup
   const hasEverSentStream = myStreams.length > 0;
 
-  const totalMonthlyOut = activeMyStreams.reduce((acc, s) => acc + Number(formatUnits(s.rate, 6)) * 2_592_000, 0);
-  const totalDeposited = activeMyStreams.reduce((acc, s) => acc + Number(formatUnits(s.deposit, 6)), 0);
+  const totalMonthlyOut = activeMyStreams.reduce((acc, s) => acc + Number(formatNativeUsdc(s.rate)) * 2_592_000, 0);
+  const totalDeposited = activeMyStreams.reduce((acc, s) => acc + Number(formatNativeUsdc(s.deposit)), 0);
 
   // ── End active streams ───────────────────────────────────────────────────
 
@@ -327,7 +328,7 @@ export default function StreamPage() {
     const ratePerSec = streamArr[2];
     const extra = ratePerSec * BigInt(tick % 5);
     const total = withdrawableRaw + extra;
-    return formatUnits(total, 6);
+    return formatNativeUsdc(total);
   }, [withdrawableRaw, streamArr, tick]);
 
   function handleCreate() {
@@ -338,7 +339,7 @@ export default function StreamPage() {
       abi: ABI,
       functionName: "createStream",
       args: [recipient as `0x${string}`, rate ?? 0n],
-      value: parseUnits(deposit, 6),
+      value: parseNativeUsdc(deposit),
     });
   }
 
@@ -349,7 +350,7 @@ export default function StreamPage() {
     return Math.floor((Number(deposit) / Number(monthly)) * 30);
   }, [deposit, monthly]);
 
-  const streamMonthly = streamArr ? Number(formatUnits(streamArr[2], 6)) * 2_592_000 : null;
+  const streamMonthly = streamArr ? Number(formatNativeUsdc(streamArr[2])) * 2_592_000 : null;
   const streamRunwayDays = remainingTimeSec !== undefined
     ? Math.floor(Number(remainingTimeSec) / 86400)
     : null;
@@ -669,13 +670,13 @@ export default function StreamPage() {
                             <div>
                               <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Monthly</p>
                               <span className="text-sm text-white">
-                                {(Number(formatUnits(s.rate, 6)) * 2_592_000).toFixed(2)} USDC
+                                {(Number(formatNativeUsdc(s.rate)) * 2_592_000).toFixed(2)} USDC
                               </span>
                             </div>
                             <div>
                               <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Withdrawable</p>
                               <span className="text-sm font-medium text-[#ffb38a]">
-                                {Number(formatUnits(s.withdrawable, 6)).toFixed(4)} USDC
+                                {Number(formatNativeUsdc(s.withdrawable)).toFixed(4)} USDC
                               </span>
                             </div>
                             <div>

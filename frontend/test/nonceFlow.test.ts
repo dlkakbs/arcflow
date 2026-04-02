@@ -16,7 +16,7 @@ import {
 } from './helpers'
 
 const CLIENT = '0xabcd1234abcd1234abcd1234abcd1234abcd1234'
-const PRICE = BigInt(1_000) // 0.001 USDC
+const PRICE = BigInt(1e15) // 0.001 native USDC (18 decimals)
 
 let redis: ReturnType<typeof createTestRedis>
 

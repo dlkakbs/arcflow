@@ -17,7 +17,7 @@ contract ArcFlow {
     struct Stream {
         address payer;
         address recipient;
-        uint256 rate;        // wei/saniye, örn. 31 = ~0.001 USDC/gün
+        uint256 rate;        // wei/saniye, native USDC 18 decimals
         uint256 startTime;   // stream başlangıcı
         uint256 deposit;     // toplam yatırılan USDC
         uint256 withdrawn;   // recipient'in çektiği toplam
@@ -56,7 +56,7 @@ contract ArcFlow {
 
     /// @param recipient  Ödeme alacak adres
     /// @param rate       Saniyede kaç wei USDC akacak
-    ///                   Örnek hesap: aylık 1000 USDC → rate = 1000e6 / 30 / 86400 ≈ 385
+    ///                   Örnek hesap: aylık 1000 USDC → rate = 1000e18 / 30 / 86400
     function createStream(address recipient, uint256 rate) external payable returns (uint256 id) {
         if (msg.value == 0) revert ZeroDeposit();
         if (rate == 0)      revert ZeroRate();
@@ -149,7 +149,7 @@ contract ArcFlow {
         return (s.deposit - consumed) / s.rate;
     }
 
-    /// Saniyede kaç USDC akıyor (6 decimal, okunabilir)
+    /// Saniyede kaç native USDC akıyor (18 decimal)
     function ratePerSecond(uint256 id) external view returns (uint256) {
         return streams[id].rate;
     }

@@ -1,10 +1,11 @@
 import { createPublicClient, http } from "viem";
 import { defineChain } from "viem";
+import { ARC_NATIVE_USDC_DECIMALS } from "@/lib/nativeUsdc";
 
 const arcTestnet = defineChain({
   id: 5042002,
   name: "Arc Testnet",
-  nativeCurrency: { name: "USD Coin", symbol: "USDC", decimals: 6 },
+  nativeCurrency: { name: "USD Coin", symbol: "USDC", decimals: ARC_NATIVE_USDC_DECIMALS },
   rpcUrls: {
     default: { http: ["https://rpc.testnet.arc.network"] },
   },

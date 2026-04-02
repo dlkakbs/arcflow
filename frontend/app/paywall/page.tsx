@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract, useSignMessage } from "wagmi";
 import { useAutoHide } from "@/lib/useAutoHide";
-import { formatUnits, parseUnits, keccak256, encodePacked, toBytes } from "viem";
+import { keccak256, encodePacked, toBytes } from "viem";
 import { CONTRACTS } from "@/lib/wagmi";
 import { PAYWALL_ADDRESS } from "@/lib/arcChain";
+import { formatNativeUsdc, parseNativeUsdc } from "@/lib/nativeUsdc";
 
 const ARC_CHAIN_ID = 5042002;
 import { ArrowUpRight, Sparkles, Wallet, Gauge, Coins, Zap, Code2, LayoutGrid, CheckCircle2 } from "lucide-react";
@@ -236,7 +237,7 @@ export default function PaywallPage() {
       address: CONTRACTS.arcPaywall,
       abi: ABI,
       functionName: "deposit",
-      value: parseUnits(depositAmt, 6),
+      value: parseNativeUsdc(depositAmt),
     });
   }
 
@@ -298,13 +299,13 @@ export default function PaywallPage() {
       address: CONTRACTS.arcPaywall,
       abi: ABI,
       functionName: "withdraw",
-      args: [parseUnits(withdrawAmt, 6)],
+      args: [parseNativeUsdc(withdrawAmt)],
     });
   }
 
   const requestEstimate = useMemo(() => {
     if (!depositAmt || price === undefined) return null;
-    const numericPrice = Number(formatUnits(price, 6));
+    const numericPrice = Number(formatNativeUsdc(price));
     if (!numericPrice) return null;
     return Math.floor(Number(depositAmt) / numericPrice);
   }, [depositAmt, price]);
@@ -341,7 +342,7 @@ export default function PaywallPage() {
             <div className="mb-6 grid gap-4 md:grid-cols-3">
               <Stat
                 label="Balance"
-                value={balance !== undefined ? `${formatUnits(balance, 6)} USDC` : "—"}
+                value={balance !== undefined ? `${formatNativeUsdc(balance)} USDC` : "—"}
                 icon={<Wallet className="h-4 w-4" />}
               />
               <Stat
@@ -351,7 +352,7 @@ export default function PaywallPage() {
               />
               <Stat
                 label="Price / request"
-                value={price !== undefined ? `${formatUnits(price, 6)} USDC` : "—"}
+                value={price !== undefined ? `${formatNativeUsdc(price)} USDC` : "—"}
                 icon={<Coins className="h-4 w-4" />}
               />
             </div>
@@ -431,7 +432,7 @@ export default function PaywallPage() {
                       onChange={(e) => setWithdrawAmt(e.target.value)}
                     />
                     {balance !== undefined && (
-                      <p className="mt-2 text-sm text-white/45">Available: {formatUnits(balance, 6)} USDC</p>
+                      <p className="mt-2 text-sm text-white/45">Available: {formatNativeUsdc(balance)} USDC</p>
                     )}
                   </div>
 

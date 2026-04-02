@@ -4,8 +4,9 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { useAutoHide } from "@/lib/useAutoHide";
-import { decodeEventLog, parseUnits } from "viem";
+import { decodeEventLog } from "viem";
 import { CONTRACTS } from "@/lib/wagmi";
+import { parseNativeUsdc } from "@/lib/nativeUsdc";
 import { ArrowUpRight, Sparkles } from "lucide-react";
 
 const ABI = [
@@ -153,7 +154,7 @@ export default function InvoicePage() {
       address: CONTRACTS.arcInvoice,
       abi: ABI,
       functionName: "createInvoice",
-      args: [parseUnits(amount, 6), desc, BigInt(deadlineTs)],
+      args: [parseNativeUsdc(amount), desc, BigInt(deadlineTs)],
     });
   }
 
@@ -164,7 +165,7 @@ export default function InvoicePage() {
       abi: ABI,
       functionName: "payInvoice",
       args: [BigInt(payId)],
-      value: parseUnits(payAmount, 6),
+      value: parseNativeUsdc(payAmount),
     });
   }
 

@@ -10,14 +10,14 @@ contract ArcFlowTest is Test {
     address payer     = makeAddr("payer");
     address recipient = makeAddr("recipient");
 
-    // Aylık 1000 USDC → saniye başına rate
-    // 1000e6 / 2_592_000 ≈ 385 wei/saniye
-    uint256 constant RATE    = 385;
-    uint256 constant DEPOSIT = 1000e6; // 1000 USDC
+    // Aylık 1000 native USDC → saniye başına rate
+    // 1000e18 / 2_592_000 ≈ 385_802_469_135_802 wei/saniye
+    uint256 constant RATE    = 385_802_469_135_802;
+    uint256 constant DEPOSIT = 1000 ether; // 1000 native USDC
 
     function setUp() public {
         flow = new ArcFlow();
-        vm.deal(payer, 10_000e6); // payer'a test USDC ver
+        vm.deal(payer, 10_000 ether); // payer'a test native USDC ver
     }
 
     // ─── createStream ───────────────────────────────────────────────────
@@ -57,8 +57,8 @@ contract ArcFlowTest is Test {
         vm.warp(block.timestamp + 86400);
 
         uint256 amount = flow.withdrawable(id);
-        // 385 * 86400 = 33_264_000 wei ≈ 33.26 USDC
-        assertApproxEqAbs(amount, 33_264_000, 1000);
+        // RATE * 86400 ≈ 33.333333333333292800 native USDC
+        assertApproxEqAbs(amount, 33_333_333_333_333_292_800, 1000);
     }
 
     function test_withdrawable_capsAtDeposit() public {
@@ -153,10 +153,10 @@ contract ArcFlowTest is Test {
         uint256 id = flow.createStream{value: DEPOSIT}(recipient, RATE);
 
         vm.prank(payer);
-        flow.topUp{value: 500e6}(id);
+        flow.topUp{value: 500 ether}(id);
 
         (,,,, uint256 deposit,,) = flow.streams(id);
-        assertEq(deposit, DEPOSIT + 500e6);
+        assertEq(deposit, DEPOSIT + 500 ether);
     }
 
     // ─── remainingTime ──────────────────────────────────────────────────
@@ -166,14 +166,14 @@ contract ArcFlowTest is Test {
         uint256 id = flow.createStream{value: DEPOSIT}(recipient, RATE);
 
         uint256 remaining = flow.remainingTime(id);
-        // 1000e6 / 385 ≈ 2_597_402 saniye ≈ 30 gün
+        // 1000e18 / RATE ≈ 2_592_000 saniye ≈ 30 gün
         assertApproxEqAbs(remaining, 2_597_402, 10000);
     }
 
     // ─── monthlyToRate helper ────────────────────────────────────────────
 
     function test_monthlyToRate() public view {
-        uint256 rate = flow.monthlyToRate(1000e6);
-        assertEq(rate, uint256(1000e6) / 2_592_000);
+        uint256 rate = flow.monthlyToRate(1000 ether);
+        assertEq(rate, uint256(1000 ether) / 2_592_000);
     }
 }

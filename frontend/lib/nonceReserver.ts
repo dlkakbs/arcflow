@@ -1,6 +1,6 @@
 import { Redis } from '@upstash/redis'
 
-// Arc Testnet — USDC native, 6 decimal
+// Arc Testnet — native USDC uses 18 decimals
 export const ARC_CHAIN_ID = 5042002
 export const PAYWALL_ADDRESS = '0xb1f95F4d86C743cbe1797C931A9680dF5766633A' as `0x${string}`
 export const RESERVATION_TTL = 300 // 5 dakika

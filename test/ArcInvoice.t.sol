@@ -10,11 +10,11 @@ contract ArcInvoiceTest is Test {
     address freelancer = makeAddr("freelancer");
     address client     = makeAddr("client");
 
-    uint256 constant AMOUNT = 500e6; // 500 USDC
+    uint256 constant AMOUNT = 500 ether; // 500 native USDC
 
     function setUp() public {
         inv = new ArcInvoice();
-        vm.deal(client, 10_000e6);
+        vm.deal(client, 10_000 ether);
     }
 
     // ─── createInvoice ──────────────────────────────────────────────────

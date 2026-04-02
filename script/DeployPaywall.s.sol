@@ -8,8 +8,8 @@ contract DeployArcPaywall is Script {
     function run() external {
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
 
-        // 0.001 USDC = 1000 (6 decimal, native Arc USDC)
-        uint256 pricePerRequest = 1000;
+        // 0.001 native USDC = 1e15 (18 decimals)
+        uint256 pricePerRequest = 1e15;
 
         vm.startBroadcast(deployerKey);
         ArcPaywall paywall = new ArcPaywall(pricePerRequest);
