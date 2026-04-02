@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { useAutoHide } from "@/lib/useAutoHide";
 import { decodeEventLog } from "viem";
 import { CONTRACTS } from "@/lib/wagmi";
-import { parseNativeUsdc } from "@/lib/nativeUsdc";
+import { formatNativeUsdc, parseNativeUsdc } from "@/lib/nativeUsdc";
 import { ArrowUpRight, Sparkles } from "lucide-react";
 
 const ABI = [
@@ -38,7 +38,7 @@ const ABI = [
       { name: "amount", type: "uint256" },
       { name: "description", type: "string" },
       { name: "deadline", type: "uint256" },
-      { name: "paid", type: "bool" },
+      { name: "status", type: "uint8" },
     ],
   },
   {
@@ -122,10 +122,50 @@ export default function InvoicePage() {
     abi: ABI,
     functionName: "invoices",
     args: payId ? [BigInt(payId)] : undefined,
-    query: { enabled: !!payId },
+    query: { enabled: !!payId, refetchInterval: 5000 },
   });
-  const invoiceCreator = invoiceData ? (invoiceData as readonly [string, ...unknown[]])[0] as string : null;
+
+  const invoiceDetails = useMemo(() => {
+    if (!invoiceData) return null;
+    const [creator, amountRaw, description, deadlineRaw, statusRaw] =
+      invoiceData as readonly [string, bigint, string, bigint, number];
+
+    const exists = creator !== "0x0000000000000000000000000000000000000000" && amountRaw > 0n;
+    const deadline = Number(deadlineRaw);
+    const isExpired = deadline !== 0 && Date.now() / 1000 > deadline;
+
+    return {
+      creator,
+      amountRaw,
+      amountFormatted: formatNativeUsdc(amountRaw),
+      description,
+      deadline,
+      status: Number(statusRaw),
+      exists,
+      isExpired,
+    };
+  }, [invoiceData]);
+
+  useEffect(() => {
+    if (invoiceDetails?.exists) {
+      setPayAmount(invoiceDetails.amountFormatted);
+    }
+  }, [invoiceDetails?.exists, invoiceDetails?.amountFormatted]);
+
+  const invoiceCreator = invoiceDetails?.creator ?? null;
   const isSelfPay = !!(address && invoiceCreator && address.toLowerCase() === invoiceCreator.toLowerCase());
+  const isInvoiceInvalid = !!payId && invoiceDetails !== null && !invoiceDetails.exists;
+  const isInvoicePaid = invoiceDetails?.status === 1;
+  const isInvoiceCanceled = invoiceDetails?.status === 2;
+  const isInvoiceExpired = !!invoiceDetails?.isExpired;
+  const canPayInvoice =
+    !!payId &&
+    !!payAmount &&
+    !isSelfPay &&
+    !isInvoiceInvalid &&
+    !isInvoicePaid &&
+    !isInvoiceCanceled &&
+    !isInvoiceExpired;
 
   const createBusy = isCreatePending || isCreateMining;
   const payBusy = isPayPending || isPayMining;
@@ -278,8 +318,27 @@ export default function InvoicePage() {
                       placeholder="500"
                       value={payAmount}
                       onChange={(e) => setPayAmount(e.target.value)}
+                      readOnly={!!invoiceDetails?.exists}
                     />
+                    {invoiceDetails?.exists && (
+                      <p className="mt-2 text-sm text-white/45">Auto-filled from invoice #{payId}.</p>
+                    )}
                   </div>
+
+                  {invoiceDetails?.exists && (
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-white/70 space-y-1.5">
+                      <p><span className="text-white/40">Creator:</span> {invoiceDetails.creator}</p>
+                      <p><span className="text-white/40">Description:</span> {invoiceDetails.description || "—"}</p>
+                      <p><span className="text-white/40">Status:</span> {isInvoicePaid ? "Paid" : isInvoiceCanceled ? "Canceled" : "Pending"}</p>
+                      <p><span className="text-white/40">Deadline:</span> {invoiceDetails.deadline === 0 ? "No deadline" : new Date(invoiceDetails.deadline * 1000).toLocaleString()}</p>
+                    </div>
+                  )}
+
+                  {isInvoiceInvalid && (
+                    <p className="rounded-2xl border border-red-400/20 bg-red-400/8 px-4 py-3 text-sm text-red-300">
+                      No invoice found for this ID.
+                    </p>
+                  )}
 
                   {isSelfPay && (
                     <p className="rounded-2xl border border-yellow-400/20 bg-yellow-400/8 px-4 py-3 text-sm text-yellow-300">
@@ -287,9 +346,27 @@ export default function InvoicePage() {
                     </p>
                   )}
 
+                  {isInvoicePaid && (
+                    <p className="rounded-2xl border border-yellow-400/20 bg-yellow-400/8 px-4 py-3 text-sm text-yellow-300">
+                      This invoice has already been paid.
+                    </p>
+                  )}
+
+                  {isInvoiceCanceled && (
+                    <p className="rounded-2xl border border-yellow-400/20 bg-yellow-400/8 px-4 py-3 text-sm text-yellow-300">
+                      This invoice was canceled and can no longer be paid.
+                    </p>
+                  )}
+
+                  {isInvoiceExpired && (
+                    <p className="rounded-2xl border border-yellow-400/20 bg-yellow-400/8 px-4 py-3 text-sm text-yellow-300">
+                      This invoice has expired and can no longer be paid.
+                    </p>
+                  )}
+
                   <button
                     onClick={handlePay}
-                    disabled={!isConnected || payBusy || !payId || !payAmount || isSelfPay}
+                    disabled={!isConnected || payBusy || !canPayInvoice}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/14 bg-white/8 px-6 py-4 text-sm font-semibold text-white transition disabled:opacity-40"
                   >
                     {payBusy ? "Processing..." : "Pay invoice"}
@@ -310,6 +387,10 @@ export default function InvoicePage() {
                       </a>
                     </div>
                   )}
+
+                  <p className="text-xs text-white/35">
+                    Creating an invoice does not escrow funds. It only publishes a payable request on-chain.
+                  </p>
                 </div>
               </GlassCard>
             </Reveal>
