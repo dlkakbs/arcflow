@@ -3,6 +3,7 @@ import { keccak256, encodePacked, recoverMessageAddress } from 'viem'
 import { markSubmitted, enqueueItem, getRedis } from '@/lib/nonceReserver'
 import { settleBatch, BATCH_SIZE } from '@/lib/batchSettler'
 import { publicClient, PAYWALL_ADDRESS, PAYWALL_ABI, arcTestnet } from '@/lib/arcChain'
+import { getArcDocsAnswer } from '@/lib/arcDocs'
 import { createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
@@ -54,10 +55,6 @@ function getArcAiResponse(prompt: string): string {
 
   // Fallback — still useful
   return `You asked: "${prompt.length > 80 ? prompt.slice(0, 80) + '…' : prompt}". I'm the Arc AI Assistant — a general-purpose agent running on ArcFlow's per-request payment infrastructure. I can help with crypto, smart contracts, coding, payments, and more. Try asking something specific!`
-}
-
-function getDemoResponse(prompt: string): string {
-  return getArcAiResponse(prompt)
 }
 
 export async function POST(req: NextRequest) {
@@ -139,11 +136,13 @@ export async function POST(req: NextRequest) {
     args: [clientAddress as `0x${string}`],
   })
 
+  const docsAnswer = getArcDocsAnswer(prompt ?? '')
+
   const result = {
     success: true,
     response: {
-      message:   getDemoResponse(prompt ?? ''),
-      model:     'arc-ai-assistant-v1',
+      message:   docsAnswer?.message ?? getArcAiResponse(prompt ?? ''),
+      model:     docsAnswer?.model ?? 'arc-ai-assistant-v1',
       timestamp: new Date().toISOString(),
     },
     creditsUsed:      1,

@@ -61,8 +61,8 @@ type ServiceEntry = {
 const DEMO_SERVICES: ServiceEntry[] = [
   {
     serviceId: "svc_demo_ai",
-    name: "Arc AI Assistant",
-    desc: "General-purpose AI chat powered by Claude. Ask anything, get answers instantly.",
+    name: "Arc Docs Assistant",
+    desc: "Ask questions about Arc docs, network setup, gas, native USDC, and EVM compatibility.",
     price: "0.001",
     proxyUrl: "https://flowonarc.vercel.app/api/request",
     demo: true,
@@ -498,7 +498,7 @@ export default function PaywallPage() {
               <div className="mt-6 space-y-3 max-w-xl">
                 <textarea
                   rows={3}
-                  placeholder="Ask anything — crypto, coding, payments, general knowledge..."
+                  placeholder="Ask about Arc docs — RPC, chain ID, gas, native USDC, EVM compatibility..."
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={(e) => {
