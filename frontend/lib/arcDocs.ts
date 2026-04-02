@@ -12,8 +12,6 @@ interface ArcDocEntry {
   keywords: string[]
 }
 
-const ARC_DOCS_SNAPSHOT_DATE = '2026-04-02'
-
 const ARC_DOCS: ArcDocEntry[] = [
   {
     title: 'Welcome to Arc',
@@ -193,32 +191,9 @@ export function searchArcDocs(prompt: string, limit = 3): ArcDocMatch[] {
     .slice(0, limit)
 }
 
-function buildAnswerBody(prompt: string, matches: ArcDocMatch[]): string {
+function buildAnswerBody(matches: ArcDocMatch[]): string {
   const top = matches[0]
-  const lower = normalize(prompt)
-
-  if (lower.includes('rpc') || lower.includes('chain id') || lower.includes('faucet') || lower.includes('wallet')) {
-    return `${top.summary} Source: ${top.url}`
-  }
-
-  if (lower.includes('gas') || lower.includes('fee') || lower.includes('cost') || lower.includes('gwei')) {
-    return `${top.summary} Related doc: ${top.url}`
-  }
-
-  if (lower.includes('evm') || lower.includes('solidity') || lower.includes('foundry') || lower.includes('hardhat')) {
-    return `${top.summary} Developer reference: ${top.url}`
-  }
-
-  if (matches.length === 1) {
-    return `${top.summary} Source: ${top.url}`
-  }
-
-  const related = matches
-    .slice(1)
-    .map((match) => `${match.title}: ${match.url}`)
-    .join(' | ')
-
-  return `${top.summary} Related docs: ${related}`
+  return `${top.summary} Source: ${top.url}`
 }
 
 export function getArcDocsAnswer(prompt: string): { message: string; model: string } | null {
@@ -228,9 +203,7 @@ export function getArcDocsAnswer(prompt: string): { message: string; model: stri
   const top = matches[0]
   if (top.score < 3) return null
 
-  const message =
-    `Based on the Arc docs snapshot (${ARC_DOCS_SNAPSHOT_DATE}), the closest match is "${top.title}". ` +
-    buildAnswerBody(prompt, matches)
+  const message = buildAnswerBody(matches)
 
   return {
     message,
