@@ -158,6 +158,11 @@ export default function StreamPage() {
   const { isLoading: isCancelMining, isSuccess: isCancelSuccess } = useWaitForTransactionReceipt({ hash: cancelHash });
   const [cancellingId, setCancellingId] = useState<number | null>(null);
 
+  const { writeContract: writeIncomingWithdraw, data: incomingWithdrawHash, isPending: isIncomingWithdrawPending } = useWriteContract();
+  const { isLoading: isIncomingWithdrawMining, isSuccess: isIncomingWithdrawSuccess } = useWaitForTransactionReceipt({ hash: incomingWithdrawHash });
+  const [withdrawingIncomingId, setWithdrawingIncomingId] = useState<number | null>(null);
+  const showIncomingWithdrawSuccess = useAutoHide(isIncomingWithdrawSuccess);
+
   const showCreateSuccess = useAutoHide(isSuccess, 12000);
   const showWithdrawSuccess = useAutoHide(isWithdrawSuccess);
   // cancelledStreamIds: IDs added immediately on click (keeps row visible during mining)
@@ -255,6 +260,15 @@ export default function StreamPage() {
     })),
   [totalStreams]);
 
+  const remainingTimeCalls = useMemo(() =>
+    Array.from({ length: totalStreams }, (_, i) => ({
+      address: CONTRACTS.arcFlow as `0x${string}`,
+      abi: ABI,
+      functionName: "remainingTime" as const,
+      args: [BigInt(i)] as [bigint],
+    })),
+  [totalStreams]);
+
   const { data: allStreamsRaw } = useReadContracts({
     contracts: streamCalls,
     query: { enabled: totalStreams > 0, refetchInterval: 10000 },
@@ -263,6 +277,11 @@ export default function StreamPage() {
   const { data: allWithdrawableRaw } = useReadContracts({
     contracts: withdrawableCalls,
     query: { enabled: totalStreams > 0, refetchInterval: 8000 },
+  });
+
+  const { data: allRemainingTimeRaw } = useReadContracts({
+    contracts: remainingTimeCalls,
+    query: { enabled: totalStreams > 0, refetchInterval: 10000 },
   });
 
   const myStreams = useMemo(() => {
@@ -279,6 +298,25 @@ export default function StreamPage() {
       })
       .filter(Boolean) as Array<{ id: number; payer: string; recipient: string; rate: bigint; startTime: bigint; deposit: bigint; withdrawn: bigint; active: boolean; withdrawable: bigint }>;
   }, [allStreamsRaw, allWithdrawableRaw, address]);
+
+  const incomingStreams = useMemo(() => {
+    if (!allStreamsRaw || !address) return [];
+    return allStreamsRaw
+      .map((res, i) => {
+        if (res.status !== "success") return null;
+        const s = res.result as readonly [string, string, bigint, bigint, bigint, bigint, boolean];
+        if (!s[6]) return null;
+        if (s[1].toLowerCase() !== address.toLowerCase()) return null;
+        const withdrawableVal = allWithdrawableRaw?.[i]?.status === "success"
+          ? (allWithdrawableRaw[i].result as bigint)
+          : 0n;
+        const remainingTimeSecs = allRemainingTimeRaw?.[i]?.status === "success"
+          ? Number(allRemainingTimeRaw[i].result as bigint)
+          : null;
+        return { id: i, payer: s[0], recipient: s[1], rate: s[2], startTime: s[3], deposit: s[4], withdrawn: s[5], active: s[6], withdrawable: withdrawableVal, remainingTime: remainingTimeSecs };
+      })
+      .filter(Boolean) as Array<{ id: number; payer: string; recipient: string; rate: bigint; startTime: bigint; deposit: bigint; withdrawn: bigint; active: boolean; withdrawable: bigint; remainingTime: number | null }>;
+  }, [allStreamsRaw, allWithdrawableRaw, allRemainingTimeRaw, address]);
 
   const activeMyStreams = myStreams.filter((s) => s.active);
   // visibleStreams: active streams + any stream in cancelledStreamIds (kept visible until timer expires)
@@ -612,6 +650,104 @@ export default function StreamPage() {
               </div>
             </GlassCard>
           </Reveal>
+
+          {/* Ongoing incoming streams */}
+          {isConnected && incomingStreams.length > 0 && (
+            <Reveal>
+              <GlassCard className="overflow-hidden">
+                <div className="border-b border-white/10 p-7 md:p-8">
+                  <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm uppercase tracking-[0.24em] text-white/50">Incoming</p>
+                      <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">Ongoing streams</h2>
+                    </div>
+                    <div className="rounded-[1.2rem] border border-white/10 bg-black/20 px-5 py-3 text-center">
+                      <div className="text-xl font-semibold text-white">{incomingStreams.length}</div>
+                      <div className="mt-0.5 text-xs text-white/45 uppercase tracking-[0.18em]">Active</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-7 md:p-8">
+                  <div className="mb-3 hidden grid-cols-[2fr_1.5fr_1.5fr_1.5fr_120px] gap-4 px-4 text-xs uppercase tracking-[0.2em] text-white/35 md:grid">
+                    <span>From</span>
+                    <span>Withdrawable</span>
+                    <span>Monthly</span>
+                    <span>Runway</span>
+                    <span></span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {incomingStreams.map((s) => {
+                      const isThisWithdrawing = withdrawingIncomingId === s.id && (isIncomingWithdrawPending || isIncomingWithdrawMining);
+                      const liveWithdrawable = (() => {
+                        const extra = s.rate * BigInt(tick % 5);
+                        return s.withdrawable + extra;
+                      })();
+                      const runwayDaysIncoming = s.remainingTime !== null ? Math.floor(s.remainingTime / 86400) : null;
+                      const monthlyIncoming = Number(formatNativeUsdc(s.rate)) * 2_592_000;
+                      return (
+                        <div key={s.id} className="space-y-2">
+                          <div className="grid grid-cols-1 gap-3 rounded-2xl border border-white/8 bg-black/15 p-4 md:grid-cols-[2fr_1.5fr_1.5fr_1.5fr_120px] md:items-center md:gap-4">
+                            <div>
+                              <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">From</p>
+                              <span className="font-mono text-sm text-white">{shortAddr(s.payer)}</span>
+                              <span className="ml-2 text-xs text-white/35">#{s.id}</span>
+                            </div>
+                            <div>
+                              <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Withdrawable</p>
+                              <span className="text-sm font-medium text-[#ffb38a] tabular-nums">
+                                {Number(formatNativeUsdc(liveWithdrawable)).toFixed(6)} USDC
+                              </span>
+                            </div>
+                            <div>
+                              <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Monthly</p>
+                              <span className="text-sm text-white">{monthlyIncoming.toFixed(2)} USDC</span>
+                            </div>
+                            <div>
+                              <p className="text-xs text-white/40 md:hidden uppercase tracking-[0.18em] mb-1">Runway</p>
+                              <span className="text-sm text-white">{runwayDaysIncoming !== null ? `${runwayDaysIncoming} days` : "—"}</span>
+                            </div>
+                            <div>
+                              <button
+                                onClick={() => {
+                                  setWithdrawingIncomingId(s.id);
+                                  writeIncomingWithdraw({
+                                    address: CONTRACTS.arcFlow,
+                                    abi: ABI,
+                                    functionName: "withdraw",
+                                    args: [BigInt(s.id)],
+                                  });
+                                }}
+                                disabled={!isConnected || isThisWithdrawing || s.withdrawable === 0n}
+                                className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[#fff4ec] px-4 py-2 text-xs font-semibold text-[#291c28] transition disabled:opacity-40"
+                              >
+                                {isThisWithdrawing ? "Withdrawing…" : "Withdraw"}
+                                <ArrowUpRight className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                          {showIncomingWithdrawSuccess && withdrawingIncomingId === s.id && incomingWithdrawHash && (
+                            <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 px-4 py-3 text-sm text-[#ffd7c7] flex items-center gap-3">
+                              <span>Withdrawn successfully.</span>
+                              <a
+                                href={`https://testnet.arcscan.app/tx/${incomingWithdrawHash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 font-medium text-[#ffb38a] underline underline-offset-2"
+                              >
+                                View tx <ArrowUpRight className="h-3 w-3" />
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </GlassCard>
+            </Reveal>
+          )}
 
           {/* Active streams */}
           {isConnected && visibleStreams.length > 0 && (
