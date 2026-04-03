@@ -204,7 +204,7 @@ export default function StreamPage() {
   });
 
   // Active stream ID (from creation or manual lookup)
-  const activeId = streamId ?? (confirmedLookupId ? BigInt(confirmedLookupId) : null);
+  const activeId = confirmedLookupId ? BigInt(confirmedLookupId) : null;
 
   const { data: streamData } = useReadContract({
     address: CONTRACTS.arcFlow,
