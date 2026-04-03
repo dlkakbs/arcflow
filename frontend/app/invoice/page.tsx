@@ -271,6 +271,10 @@ export default function InvoicePage() {
                     <ArrowUpRight className="h-4 w-4" />
                   </button>
 
+                  <p className="text-xs text-white/35">
+                    Creating an invoice does not escrow funds. It only publishes a payable request on-chain.
+                  </p>
+
                   {showCreateSuccess && createHash && (
                     <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7] space-y-2">
                       {invoiceId !== null ? (
@@ -388,9 +392,6 @@ export default function InvoicePage() {
                     </div>
                   )}
 
-                  <p className="text-xs text-white/35">
-                    Creating an invoice does not escrow funds. It only publishes a payable request on-chain.
-                  </p>
                 </div>
               </GlassCard>
             </Reveal>
