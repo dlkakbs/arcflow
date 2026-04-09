@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { publicClient, PAYWALL_ADDRESS, PAYWALL_ABI } from '@/lib/arcChain'
 import { reserveNonce } from '@/lib/nonceReserver'
+import { getOnChainNonce, getSignatureDeadline } from '@/lib/paywallPayment'
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,12 +33,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // nextNonce — eski contract'ta yok, backend counter kullan (0'dan başla)
-    const readContract = async (_addr: string): Promise<number> => 0
+    const readContract = async (addr: string): Promise<number> => getOnChainNonce(addr)
 
     const { nonce, reservationId } = await reserveNonce(clientAddress, readContract)
 
-    const deadline = Math.floor(Date.now() / 1000) + 600
+    const deadline = getSignatureDeadline(Date.now())
 
     return NextResponse.json({
       nonce,

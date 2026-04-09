@@ -5,7 +5,7 @@ import {
   PAYWALL_ADDRESS,
   ARC_CHAIN_ID,
 } from './nonceReserver'
-import { keccak256, encodePacked, toBytes } from 'viem'
+import { keccak256, encodePacked } from 'viem'
 
 export const BATCH_SIZE = 50
 export const BATCH_INTERVAL_MS = 10 * 60 * 1000 // 10 dakika
@@ -48,7 +48,8 @@ export async function settleBatch(
     nonces: bigint[]
     deadlines: bigint[]
     signatures: string[]
-  }) => Promise<string>
+  }) => Promise<string>,
+  readNonceAfterWrite?: (clientAddress: string) => Promise<number>
 ): Promise<BatchResult> {
   const now = Math.floor(Date.now() / 1000)
 
@@ -56,12 +57,15 @@ export async function settleBatch(
 
   const valid: typeof items = []
   const skipped: number[] = []
+  let expectedNonce = onChainNonce
 
   for (const item of items) {
+    if (item.nonce !== expectedNonce) break
+
     // Süresi geçmiş → skip
     if (item.deadline <= now) {
       skipped.push(item.nonce)
-      continue
+      break
     }
     // On-chain nonce'dan küçük → zaten settled → skip
     if (item.nonce < onChainNonce) {
@@ -69,6 +73,7 @@ export async function settleBatch(
       continue
     }
     valid.push(item)
+    expectedNonce++
   }
 
   if (valid.length === 0) return { nonces: [], skipped }
@@ -80,10 +85,17 @@ export async function settleBatch(
     signatures: valid.map(i => i.signature),
   })
 
-  const settledNonces = valid.map(i => i.nonce)
-  const maxNonce = Math.max(...settledNonces)
+  const settledThrough = readNonceAfterWrite
+    ? await readNonceAfterWrite(clientAddress)
+    : onChainNonce + valid.length
 
-  await removeSettled(clientAddress, maxNonce)
+  const settledNonces = valid
+    .filter((item) => item.nonce < settledThrough)
+    .map((item) => item.nonce)
+
+  if (settledNonces.length > 0) {
+    await removeSettled(clientAddress, settledThrough - 1)
+  }
   await syncPendingCounter(clientAddress)
 
   return { nonces: settledNonces, skipped, txHash }

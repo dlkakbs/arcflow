@@ -92,6 +92,12 @@ export async function enqueueItem(
   await redis.sadd('active-clients', addr)
 }
 
+export async function getQueueSize(clientAddress: string): Promise<number> {
+  const redis = getRedis()
+  const size = await redis.zcard(`queue:${clientAddress.toLowerCase()}`)
+  return Number(size)
+}
+
 // Settle edilecek tüm aktif client'ları getir
 export async function getActiveClients(): Promise<string[]> {
   const redis = getRedis()
@@ -128,5 +134,14 @@ export async function removeSettled(clientAddress: string, upToNonce: number): P
 // pending counter'ı sıfırla (settle sonrası)
 export async function syncPendingCounter(clientAddress: string): Promise<void> {
   const redis = getRedis()
-  await redis.del(`pending:${clientAddress.toLowerCase()}`)
+  const addr = clientAddress.toLowerCase()
+  const size = Number(await redis.zcard(`queue:${addr}`))
+
+  if (size === 0) {
+    await redis.del(`pending:${addr}`)
+    await removeActiveClient(addr)
+    return
+  }
+
+  await redis.set(`pending:${addr}`, size)
 }

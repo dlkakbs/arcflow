@@ -5,12 +5,12 @@ import { motion } from "framer-motion";
 import { useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContract, useSignMessage } from "wagmi";
 import { useAutoHide } from "@/lib/useAutoHide";
 import { keccak256, encodePacked, toBytes } from "viem";
+import { ArrowUpRight, Sparkles, Wallet, Gauge, Coins, Zap, Code2, LayoutGrid, CheckCircle2 } from "lucide-react";
 import { CONTRACTS } from "@/lib/wagmi";
 import { PAYWALL_ADDRESS } from "@/lib/arcChain";
 import { formatNativeUsdc, parseNativeUsdc } from "@/lib/nativeUsdc";
 
 const ARC_CHAIN_ID = 5042002;
-import { ArrowUpRight, Sparkles, Wallet, Gauge, Coins, Zap, Code2, LayoutGrid, CheckCircle2 } from "lucide-react";
 
 const ABI = [
   {
@@ -56,6 +56,7 @@ type ServiceEntry = {
   desc: string;
   price: string;
   proxyUrl: string;
+  ownerAddress?: string;
   demo?: boolean;
 };
 
@@ -65,7 +66,7 @@ const DEMO_SERVICES: ServiceEntry[] = [
     name: "Arc Docs Assistant",
     desc: "Ask questions about Arc docs, network setup, gas, native USDC, and EVM compatibility.",
     price: "0.001",
-    proxyUrl: "https://flowonarc.vercel.app/api/request",
+    proxyUrl: "/api/request",
     demo: true,
   },
 ];
@@ -142,7 +143,7 @@ export default function PaywallPage() {
   const [depositAmt, setDepositAmt] = useState("");
   const [withdrawAmt, setWithdrawAmt] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [apiResult, setApiResult] = useState<null | { success?: boolean; response?: { message: string; model: string; timestamp: string }; creditsUsed?: number; creditsRemaining?: string; error?: string }>(null);
+  const [apiResult, setApiResult] = useState<null | { success?: boolean; response?: { message: string; model: string; timestamp: string }; creditsUsed?: number; creditsRemaining?: string; pendingCredits?: number; error?: string }>(null);
   const [apiLoading, setApiLoading] = useState(false);
 
   // Service browse & selection
@@ -150,17 +151,22 @@ export default function PaywallPage() {
   const [selectedServiceId, setSelectedServiceId] = useState<string>("svc_demo_ai");
 
   useEffect(() => {
-    try {
-      const local: ServiceEntry[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key?.startsWith("arcflow_service_")) {
-          const raw = localStorage.getItem(key);
-          if (raw) local.push(JSON.parse(raw) as ServiceEntry);
+    let cancelled = false;
+
+    async function loadServices() {
+      try {
+        const res = await fetch("/api/services", { cache: "no-store" });
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data.services)) {
+          setServices([...DEMO_SERVICES, ...data.services as ServiceEntry[]]);
         }
+      } catch {
+        if (!cancelled) setServices(DEMO_SERVICES);
       }
-      if (local.length > 0) setServices([...DEMO_SERVICES, ...local]);
-    } catch { /* ignore */ }
+    }
+
+    loadServices();
+    return () => { cancelled = true; };
   }, []);
 
   const selectedService = services.find((s) => s.serviceId === selectedServiceId) ?? services[0];
@@ -176,13 +182,28 @@ export default function PaywallPage() {
     if (!svcName.trim() || !svcEndpoint.trim() || !address) return;
     setSvcSigning(true);
     try {
-      const serviceId = `svc_${Date.now().toString(36)}`;
-      const message = `I am publishing "${svcName}" on ArcFlow.\nEndpoint: ${svcEndpoint}\nPrice: ${svcPrice} USDC/request\nService ID: ${serviceId}`;
-      await signMessageAsync({ message });
-      const proxyUrl = `https://flowonarc.vercel.app/api/proxy?service=${serviceId}`;
-      const entry: ServiceEntry = { serviceId, name: svcName, desc: svcDesc, price: svcPrice, proxyUrl };
-      try { localStorage.setItem(`arcflow_service_${serviceId}`, JSON.stringify({ ...entry, endpoint: svcEndpoint })); } catch { /* ignore */ }
-      setServices((prev) => [...prev, entry]);
+      const message = `ArcFlow service publish\nOwner: ${address}\nName: ${svcName}\nEndpoint: ${svcEndpoint}\nPrice: ${svcPrice}\nDescription: ${svcDesc || "-"}`;
+      const signature = await signMessageAsync({ message });
+      const res = await fetch("/api/services", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ownerAddress: address,
+          name: svcName,
+          desc: svcDesc,
+          price: svcPrice,
+          endpoint: svcEndpoint,
+          signature,
+          message,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.service) {
+        throw new Error(data.error || "Failed to publish service.");
+      }
+      const entry = data.service as ServiceEntry;
+      setServices((prev) => [...prev.filter((item) => item.serviceId !== entry.serviceId), entry]);
+      setSelectedServiceId(entry.serviceId);
       setSvcResult(entry);
     } catch {
       // user rejected signature — do nothing
@@ -271,7 +292,7 @@ export default function PaywallPage() {
       const signature = await signMessageAsync({ message: { raw: toBytes(msgHash) } });
 
       const idempotencyKey = crypto.randomUUID();
-      const reqRes = await fetch("/api/request", {
+      const reqRes = await fetch(selectedService?.proxyUrl || "/api/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -542,6 +563,12 @@ export default function PaywallPage() {
                           <div className="text-xs uppercase tracking-[0.2em] text-white/40 mb-2">Credits remaining</div>
                           <div className="text-xl font-semibold text-white">{apiResult.creditsRemaining}</div>
                         </div>
+                        {typeof apiResult.pendingCredits === "number" && (
+                          <div className="flex-1 rounded-2xl border border-white/10 bg-black/20 p-4 text-center">
+                            <div className="text-xs uppercase tracking-[0.2em] text-white/40 mb-2">Pending queue</div>
+                            <div className="text-xl font-semibold text-white">{apiResult.pendingCredits}</div>
+                          </div>
+                        )}
                       </div>
                     </>
                   )}
@@ -689,7 +716,7 @@ export default function PaywallPage() {
                       <div className="flex items-start gap-2">
                         <code className="flex-1 block rounded-xl bg-black/30 px-4 py-2.5 text-sm text-[#ffb38a] font-mono break-all">{svcResult.proxyUrl}</code>
                         <button
-                          onClick={() => navigator.clipboard.writeText(svcResult.proxyUrl)}
+                          onClick={() => navigator.clipboard.writeText(`${window.location.origin}${svcResult.proxyUrl}`)}
                           className="shrink-0 rounded-xl border border-white/12 bg-white/8 px-3 py-2.5 text-xs text-white/60 hover:text-white transition"
                         >
                           Copy

@@ -1,11 +1,17 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { keccak256, encodePacked, recoverMessageAddress } from 'viem'
-import { markSubmitted, enqueueItem, getRedis } from '@/lib/nonceReserver'
+import { enqueueItem } from '@/lib/nonceReserver'
 import { settleBatch, BATCH_SIZE } from '@/lib/batchSettler'
 import { publicClient, PAYWALL_ADDRESS, PAYWALL_ABI, arcTestnet } from '@/lib/arcChain'
 import { getArcDocsAnswer } from '@/lib/arcDocs'
 import { createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
+import {
+  cacheResponse,
+  getCreditsSnapshot,
+  getOnChainNonce,
+  readCachedResponse,
+  verifyPaidRequest,
+} from '@/lib/paywallPayment'
 
 function getArcAiResponse(prompt: string): string {
   const q = prompt.toLowerCase()
@@ -65,76 +71,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  const redis = getRedis()
-
   // ── Idempotency: aynı key ile gelen tekrar istek → cache'den dön ──────
-  const cached = await redis.get<string>(`idem:${idempotencyKey}`)
-  if (cached) return NextResponse.json(typeof cached === 'string' ? JSON.parse(cached) : cached)
+  const cached = await readCachedResponse(idempotencyKey)
+  if (cached) return NextResponse.json(cached)
 
-  // ── Reservation yükle ve "submitted" olarak işaretle ─────────────────
-  const reservation = await markSubmitted(reservationId)
-  if (!reservation) {
-    return NextResponse.json(
-      { error: 'Reservation expired or already used.' },
-      { status: 400 }
-    )
-  }
-
-  // ── Deadline kontrolü ─────────────────────────────────────────────────
-  const now = Math.floor(Date.now() / 1000)
-  const deadline = Math.floor(reservation.createdAt / 1000) + 600 // get-nonce ile aynı deadline
-
-  if (now > deadline) {
-    return NextResponse.json({ error: 'Signature deadline expired.' }, { status: 400 })
-  }
-
-  // ── On-chain pricePerRequest ──────────────────────────────────────────
-  const pricePerRequest = await publicClient.readContract({
-    address: PAYWALL_ADDRESS,
-    abi: PAYWALL_ABI,
-    functionName: 'pricePerRequest',
+  const { reservation, pricePerRequest, deadline } = await verifyPaidRequest({
+    reservationId,
+    signature,
+    clientAddress,
   })
-
-  // ── İmzayı doğrula (contract ile aynı hash) ───────────────────────────
-  const msgHash = keccak256(
-    encodePacked(
-      ['address', 'uint256', 'address', 'uint256', 'uint256', 'uint256'],
-      [
-        PAYWALL_ADDRESS,
-        BigInt(arcTestnet.id),
-        clientAddress as `0x${string}`,
-        BigInt(reservation.nonce),
-        BigInt(deadline),
-        pricePerRequest,
-      ]
-    )
-  )
-
-  const recovered = await recoverMessageAddress({
-    message: { raw: msgHash },
-    signature: signature as `0x${string}`,
-  })
-
-  if (recovered.toLowerCase() !== clientAddress.toLowerCase()) {
-    return NextResponse.json({ error: 'Invalid signature.' }, { status: 401 })
-  }
 
   // ── Queue'ya ekle ─────────────────────────────────────────────────────
   await enqueueItem(clientAddress, reservation.nonce, deadline, signature)
 
   // ── Batch threshold kontrolü → settle ─────────────────────────────────
-  const queueSize = await redis.zcard(`queue:${clientAddress.toLowerCase()}`) as number
+  const { pendingQueued } = await getCreditsSnapshot(clientAddress)
+  const queueSize = pendingQueued
   if (queueSize >= BATCH_SIZE && process.env.OWNER_PRIVATE_KEY) {
     triggerBatchSettle(clientAddress, pricePerRequest).catch(console.error)
   }
 
   // ── Response ──────────────────────────────────────────────────────────
-  const remaining = await publicClient.readContract({
-    address: PAYWALL_ADDRESS,
-    abi: PAYWALL_ABI,
-    functionName: 'requestsRemaining',
-    args: [clientAddress as `0x${string}`],
-  })
+  const { onChainRemaining, pendingQueued: pendingAfterEnqueue, availableCredits } = await getCreditsSnapshot(clientAddress)
 
   const docsAnswer = getArcDocsAnswer(prompt ?? '')
 
@@ -146,11 +104,14 @@ export async function POST(req: NextRequest) {
       timestamp: new Date().toISOString(),
     },
     creditsUsed:      1,
-    creditsRemaining: (remaining - 1n).toString(),
+    creditsRemaining: availableCredits.toString(),
+    pendingCredits: pendingAfterEnqueue,
+    onChainCredits: onChainRemaining.toString(),
+    serviceId: serviceId ?? 'svc_demo_ai',
   }
 
   // Idempotency cache — 1 saat
-  await redis.setex(`idem:${idempotencyKey}`, 3600, JSON.stringify(result))
+  await cacheResponse(idempotencyKey, result)
 
   return NextResponse.json(result)
   } catch (err) {
@@ -171,16 +132,11 @@ async function triggerBatchSettle(clientAddress: string, pricePerRequest: bigint
     transport: http(),
   })
 
-  const onChainNonce = await publicClient.readContract({
-    address: PAYWALL_ADDRESS,
-    abi: PAYWALL_ABI,
-    functionName: 'nextNonce',
-    args: [clientAddress as `0x${string}`],
-  })
+  const onChainNonce = await getOnChainNonce(clientAddress)
 
   await settleBatch(
     clientAddress,
-    Number(onChainNonce),
+    onChainNonce,
     pricePerRequest,
     async ({ clients, nonces, deadlines, signatures }) => {
       const hash = await walletClient.writeContract({
@@ -190,6 +146,7 @@ async function triggerBatchSettle(clientAddress: string, pricePerRequest: bigint
         args: [clients as `0x${string}`[], nonces, deadlines, signatures as `0x${string}`[]],
       })
       return hash
-    }
+    },
+    getOnChainNonce
   )
 }

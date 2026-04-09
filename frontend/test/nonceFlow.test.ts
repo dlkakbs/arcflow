@@ -214,7 +214,7 @@ describe('Senaryo 5: Settler crash recovery', () => {
     const result = await settleBatch(CLIENT, 0, PRICE, write)
 
     expect(result.nonces).toHaveLength(0)
-    expect(result.skipped).toEqual([0, 1])
+    expect(result.skipped).toEqual([0])
     expect(settled).toHaveLength(0)
   })
 })

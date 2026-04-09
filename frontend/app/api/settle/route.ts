@@ -4,6 +4,7 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { getActiveClients, removeActiveClient } from '@/lib/nonceReserver'
 import { settleBatch } from '@/lib/batchSettler'
 import { publicClient, PAYWALL_ADDRESS, PAYWALL_ABI, arcTestnet } from '@/lib/arcChain'
+import { getOnChainNonce } from '@/lib/paywallPayment'
 
 // Vercel Cron: bu endpoint'i sadece Vercel çağırabilir
 function isAuthorized(req: NextRequest): boolean {
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
 
       const result = await settleBatch(
         clientAddress,
-        0, // backend-managed nonces
+        await getOnChainNonce(clientAddress),
         pricePerRequest,
         async ({ clients: c, nonces, deadlines, signatures }) => {
           const hash = await walletClient.writeContract({
@@ -46,7 +47,8 @@ export async function GET(req: NextRequest) {
             args: [c as `0x${string}`[], nonces, deadlines, signatures as `0x${string}`[]],
           })
           return hash
-        }
+        },
+        getOnChainNonce
       )
 
       results[clientAddress] = {
