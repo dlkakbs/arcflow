@@ -1,6 +1,6 @@
 # ArcFlow
 
-**Payment infrastructure for the Arc ecosystem — streaming, invoicing, and paywalls powered by native USDC.**
+**Payment infrastructure on Arc — streaming, invoicing, and paywalls powered by native USDC.**
 
 Live demo: [flowonarc.vercel.app](https://flowonarc.vercel.app)
 
@@ -8,7 +8,7 @@ Live demo: [flowonarc.vercel.app](https://flowonarc.vercel.app)
 
 ## What is ArcFlow?
 
-ArcFlow is the payment layer for Arc Testnet. Think Stripe, but on-chain — no intermediaries, no chargebacks, settlement in native USDC. It ships three composable payment primitives:
+ArcFlow is the payment layer on Arc Testnet. Think Stripe, but on-chain — no intermediaries, no chargebacks, settlement in native USDC. It ships three composable payment primitives:
 
 | Module | What it does |
 |--------|-------------|
