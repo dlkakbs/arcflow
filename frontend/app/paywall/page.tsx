@@ -7,65 +7,34 @@ import { useAutoHide } from "@/lib/useAutoHide";
 import { keccak256, encodePacked, toBytes } from "viem";
 import { ArrowUpRight, Sparkles, Wallet, Gauge, Coins, Zap, Code2, LayoutGrid, CheckCircle2 } from "lucide-react";
 import { CONTRACTS } from "@/lib/wagmi";
-import { PAYWALL_ADDRESS } from "@/lib/arcChain";
+import {
+  IS_PAYWALL_V2,
+  PAYWALL_ADDRESS,
+  PAYWALL_V1_ABI,
+  PAYWALL_V2_ABI,
+  publicClient,
+} from "@/lib/arcChain";
 import { formatNativeUsdc, parseNativeUsdc } from "@/lib/nativeUsdc";
 
 const ARC_CHAIN_ID = 5042002;
-
-const ABI = [
-  {
-    name: "deposit",
-    type: "function",
-    stateMutability: "payable",
-    inputs: [],
-    outputs: [],
-  },
-  {
-    name: "withdraw",
-    type: "function",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "amount", type: "uint256" }],
-    outputs: [],
-  },
-  {
-    name: "balanceOf",
-    type: "function",
-    stateMutability: "view",
-    inputs: [{ name: "client", type: "address" }],
-    outputs: [{ name: "", type: "uint256" }],
-  },
-  {
-    name: "requestsRemaining",
-    type: "function",
-    stateMutability: "view",
-    inputs: [{ name: "client", type: "address" }],
-    outputs: [{ name: "", type: "uint256" }],
-  },
-  {
-    name: "pricePerRequest",
-    type: "function",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "uint256" }],
-  },
-] as const;
+const ABI = IS_PAYWALL_V2 ? PAYWALL_V2_ABI : PAYWALL_V1_ABI;
 
 type ServiceEntry = {
   serviceId: string;
   name: string;
   desc: string;
-  price: string;
+  price?: string;
+  active?: boolean;
   proxyUrl: string;
   ownerAddress?: string;
   demo?: boolean;
 };
 
-const DEMO_SERVICES: ServiceEntry[] = [
+const DEMO_SERVICES_V1: ServiceEntry[] = [
   {
     serviceId: "svc_demo_ai",
     name: "Arc Docs Assistant",
     desc: "Ask questions about Arc docs, network setup, gas, native USDC, and EVM compatibility.",
-    price: "0.001",
     proxyUrl: "/api/request",
     demo: true,
   },
@@ -134,11 +103,14 @@ export default function PaywallPage() {
 
   const { writeContract: writeDeposit, data: depositHash, isPending: isDepositPending } = useWriteContract();
   const { writeContract: writeWithdraw, data: withdrawHash, isPending: isWithdrawPending } = useWriteContract();
+  const { writeContractAsync: writeProviderAction, isPending: isProviderActionPending } = useWriteContract();
   const { signMessageAsync } = useSignMessage();
   const [svcSigning, setSvcSigning] = useState(false);
+  const [claimHash, setClaimHash] = useState<`0x${string}` | undefined>();
 
   const { isLoading: isDepositMining, isSuccess: isDepositSuccess } = useWaitForTransactionReceipt({ hash: depositHash });
   const { isLoading: isWithdrawMining, isSuccess: isWithdrawSuccess } = useWaitForTransactionReceipt({ hash: withdrawHash });
+  const { isLoading: isClaimMining, isSuccess: isClaimSuccess } = useWaitForTransactionReceipt({ hash: claimHash });
 
   const [depositAmt, setDepositAmt] = useState("");
   const [withdrawAmt, setWithdrawAmt] = useState("");
@@ -147,8 +119,8 @@ export default function PaywallPage() {
   const [apiLoading, setApiLoading] = useState(false);
 
   // Service browse & selection
-  const [services, setServices] = useState<ServiceEntry[]>(DEMO_SERVICES);
-  const [selectedServiceId, setSelectedServiceId] = useState<string>("svc_demo_ai");
+  const [services, setServices] = useState<ServiceEntry[]>(IS_PAYWALL_V2 ? [] : DEMO_SERVICES_V1);
+  const [selectedServiceId, setSelectedServiceId] = useState<string>(IS_PAYWALL_V2 ? "" : "svc_demo_ai");
 
   useEffect(() => {
     let cancelled = false;
@@ -158,10 +130,12 @@ export default function PaywallPage() {
         const res = await fetch("/api/services", { cache: "no-store" });
         const data = await res.json();
         if (!cancelled && Array.isArray(data.services)) {
-          setServices([...DEMO_SERVICES, ...data.services as ServiceEntry[]]);
+          const nextServices = IS_PAYWALL_V2 ? (data.services as ServiceEntry[]) : [...DEMO_SERVICES_V1, ...(data.services as ServiceEntry[])];
+          setServices(nextServices);
+          setSelectedServiceId((current) => current || nextServices[0]?.serviceId || "");
         }
       } catch {
-        if (!cancelled) setServices(DEMO_SERVICES);
+        if (!cancelled) setServices(IS_PAYWALL_V2 ? [] : DEMO_SERVICES_V1);
       }
     }
 
@@ -182,16 +156,29 @@ export default function PaywallPage() {
     if (!svcName.trim() || !svcEndpoint.trim() || !address) return;
     setSvcSigning(true);
     try {
-      const message = `ArcFlow service publish\nOwner: ${address}\nName: ${svcName}\nEndpoint: ${svcEndpoint}\nPrice: ${svcPrice}\nDescription: ${svcDesc || "-"}`;
+      let serviceId: string | undefined;
+
+      if (IS_PAYWALL_V2) {
+        serviceId = keccak256(toBytes(`${address}:${svcName}:${svcEndpoint}:${Date.now()}:${crypto.randomUUID()}`));
+        const registerHash = await writeProviderAction({
+          address: CONTRACTS.arcPaywall,
+          abi: PAYWALL_V2_ABI,
+          functionName: "registerService",
+          args: [serviceId as `0x${string}`, parseNativeUsdc(svcPrice)],
+        });
+        await publicClient.waitForTransactionReceipt({ hash: registerHash });
+      }
+
+      const message = `ArcFlow service publish\nOwner: ${address}\nService ID: ${serviceId ?? "v1"}\nName: ${svcName}\nEndpoint: ${svcEndpoint}\nDescription: ${svcDesc || "-"}`;
       const signature = await signMessageAsync({ message });
       const res = await fetch("/api/services", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          serviceId,
           ownerAddress: address,
           name: svcName,
           desc: svcDesc,
-          price: svcPrice,
           endpoint: svcEndpoint,
           signature,
           message,
@@ -205,12 +192,12 @@ export default function PaywallPage() {
       setServices((prev) => [...prev.filter((item) => item.serviceId !== entry.serviceId), entry]);
       setSelectedServiceId(entry.serviceId);
       setSvcResult(entry);
-    } catch {
-      // user rejected signature — do nothing
+    } catch (err) {
+      console.error(err);
     } finally {
       setSvcSigning(false);
     }
-  }, [svcName, svcEndpoint, svcPrice, svcDesc, address, signMessageAsync]);
+  }, [svcName, svcEndpoint, svcPrice, svcDesc, address, signMessageAsync, writeProviderAction]);
 
   const { data: balance } = useReadContract({
     address: CONTRACTS.arcPaywall,
@@ -224,15 +211,37 @@ export default function PaywallPage() {
     address: CONTRACTS.arcPaywall,
     abi: ABI,
     functionName: "requestsRemaining",
-    args: address ? [address] : undefined,
-    query: { enabled: !!address, refetchInterval: 5000 },
+    args: address
+      ? (IS_PAYWALL_V2
+        ? selectedServiceId && /^0x[0-9a-fA-F]{64}$/.test(selectedServiceId)
+          ? [address, selectedServiceId as `0x${string}`]
+          : undefined
+        : [address])
+      : undefined,
+    query: { enabled: !!address && (!IS_PAYWALL_V2 || !!selectedServiceId), refetchInterval: 5000 },
   });
 
   const { data: price } = useReadContract({
     address: CONTRACTS.arcPaywall,
-    abi: ABI,
+    abi: PAYWALL_V1_ABI,
     functionName: "pricePerRequest",
-    query: { refetchInterval: 60000 },
+    query: { enabled: !IS_PAYWALL_V2, refetchInterval: 60000 },
+  });
+
+  const { data: ownerServices } = useReadContract({
+    address: CONTRACTS.arcPaywall,
+    abi: PAYWALL_V2_ABI,
+    functionName: "getOwnerServices",
+    args: address ? [address] : undefined,
+    query: { enabled: IS_PAYWALL_V2 && !!address, refetchInterval: 5000 },
+  });
+
+  const { data: claimable } = useReadContract({
+    address: CONTRACTS.arcPaywall,
+    abi: PAYWALL_V2_ABI,
+    functionName: "claimable",
+    args: address ? [address] : undefined,
+    query: { enabled: IS_PAYWALL_V2 && !!address, refetchInterval: 5000 },
   });
 
   const depositBusy = isDepositPending || isDepositMining;
@@ -241,7 +250,7 @@ export default function PaywallPage() {
   const showDepositSuccess = useAutoHide(isDepositSuccess);
   const showWithdrawSuccess = useAutoHide(isWithdrawSuccess);
 
-  // Publish panel auto-hides after 10s (longer — user needs to copy proxy URL)
+  // Publish panel auto-hides after 30s so the proxy URL is still easy to copy.
   const svcResultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [svcResultVisible, setSvcResultVisible] = useState(false);
   useEffect(() => {
@@ -263,31 +272,46 @@ export default function PaywallPage() {
   }
 
   async function handleTryRequest() {
-    if (!address || !prompt.trim()) return;
+    if (!address || !prompt.trim() || (IS_PAYWALL_V2 && !selectedServiceId)) return;
     setApiLoading(true);
     setApiResult(null);
     try {
       const nonceRes = await fetch("/api/get-nonce", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientAddress: address }),
+        body: JSON.stringify({ clientAddress: address, serviceId: IS_PAYWALL_V2 ? selectedServiceId : undefined }),
       });
       const { nonce, reservationId, deadline, pricePerRequest, error: nonceErr } = await nonceRes.json();
       if (nonceErr) { setApiResult({ error: nonceErr }); return; }
 
-      const msgHash = keccak256(
-        encodePacked(
-          ["address", "uint256", "address", "uint256", "uint256", "uint256"],
-          [
-            PAYWALL_ADDRESS,
-            BigInt(ARC_CHAIN_ID),
-            address,
-            BigInt(nonce),
-            BigInt(deadline),
-            BigInt(pricePerRequest),
-          ]
-        )
-      );
+      const msgHash = IS_PAYWALL_V2
+        ? keccak256(
+            encodePacked(
+              ["address", "uint256", "bytes32", "address", "uint256", "uint256", "uint256"],
+              [
+                PAYWALL_ADDRESS,
+                BigInt(ARC_CHAIN_ID),
+                selectedServiceId as `0x${string}`,
+                address,
+                BigInt(nonce),
+                BigInt(deadline),
+                BigInt(pricePerRequest),
+              ]
+            )
+          )
+        : keccak256(
+            encodePacked(
+              ["address", "uint256", "address", "uint256", "uint256", "uint256"],
+              [
+                PAYWALL_ADDRESS,
+                BigInt(ARC_CHAIN_ID),
+                address,
+                BigInt(nonce),
+                BigInt(deadline),
+                BigInt(pricePerRequest),
+              ]
+            )
+          );
 
       const signature = await signMessageAsync({ message: { raw: toBytes(msgHash) } });
 
@@ -325,11 +349,22 @@ export default function PaywallPage() {
   }
 
   const requestEstimate = useMemo(() => {
-    if (!depositAmt || price === undefined) return null;
-    const numericPrice = Number(formatNativeUsdc(price));
+    const selectedPrice = IS_PAYWALL_V2 && selectedService?.price ? BigInt(selectedService.price) : price;
+    if (!depositAmt || selectedPrice === undefined) return null;
+    const numericPrice = Number(formatNativeUsdc(selectedPrice as bigint));
     if (!numericPrice) return null;
     return Math.floor(Number(depositAmt) / numericPrice);
-  }, [depositAmt, price]);
+  }, [depositAmt, price, selectedService]);
+
+  const globalPriceLabel = IS_PAYWALL_V2
+    ? selectedService?.price
+      ? formatNativeUsdc(BigInt(selectedService.price))
+      : "—"
+    : price !== undefined
+      ? formatNativeUsdc(price as bigint)
+      : "0.001";
+  const providerOwnsServices = IS_PAYWALL_V2 && Array.isArray(ownerServices) && ownerServices.length > 0;
+  const showClaimSuccess = useAutoHide(isClaimSuccess);
 
   return (
     <div className="min-h-screen overflow-hidden bg-[#120f1d] text-white">
@@ -353,7 +388,7 @@ export default function PaywallPage() {
               Deposit once, consume request credits over time, and pay only for actual usage instead of bloated subscriptions.
             </p>
             <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-white/40">
-              Building an API or AI agent? Publish your service below — clients discover it here and pay per request, settled on-chain with no intermediary.
+              Building an API or AI-powered service? Publish your service below — clients discover it in the marketplace, while your real endpoint stays hidden behind the ArcFlow proxy.
             </p>
           </div>
         </Reveal>
@@ -372,8 +407,8 @@ export default function PaywallPage() {
                 icon={<Gauge className="h-4 w-4" />}
               />
               <Stat
-                label="Price / request"
-                value={price !== undefined ? `${formatNativeUsdc(price)} USDC` : "—"}
+                label={IS_PAYWALL_V2 ? "Selected price" : "Price / request"}
+                value={globalPriceLabel !== "—" ? `${globalPriceLabel} USDC` : "—"}
                 icon={<Coins className="h-4 w-4" />}
               />
             </div>
@@ -514,7 +549,7 @@ export default function PaywallPage() {
 
             <div className="p-7 md:p-8">
               <p className="max-w-xl text-sm leading-7 text-white/60">
-                Make a request and pay per call using your on-chain balance. Each request deducts one credit automatically.
+                Make a request and pay per call using your on-chain balance. Each request deducts one credit for the selected service.
               </p>
 
               <div className="mt-6 space-y-3 max-w-xl">
@@ -533,7 +568,7 @@ export default function PaywallPage() {
                 />
                 <button
                   onClick={handleTryRequest}
-                  disabled={!isConnected || apiLoading || !prompt.trim()}
+                  disabled={!isConnected || apiLoading || !prompt.trim() || (IS_PAYWALL_V2 && !selectedServiceId)}
                   className="inline-flex items-center justify-center gap-2 rounded-full bg-[#fff4ec] px-6 py-4 text-sm font-semibold text-[#291c28] transition disabled:opacity-40"
                 >
                   {apiLoading ? "Sending request..." : "Send request"}
@@ -595,10 +630,15 @@ export default function PaywallPage() {
 
             <div className="flex flex-col flex-1 p-7 md:p-8">
               <p className="mb-5 text-sm leading-7 text-white/60">
-                Pick a service below — it will be used when you send a request.
+                Pick a service below. Names and descriptions are public marketplace metadata; the real upstream endpoint stays private.
               </p>
 
               <div className="flex flex-col gap-3 flex-1">
+                {services.length === 0 && (
+                  <div className="rounded-[1.4rem] border border-white/10 bg-black/20 p-4 text-sm text-white/45">
+                    No services registered yet.
+                  </div>
+                )}
                 {services.map((svc) => {
                   const isSelected = svc.serviceId === selectedServiceId;
                   return (
@@ -620,7 +660,7 @@ export default function PaywallPage() {
                         </div>
                         <p className="mt-1 text-xs leading-5 text-white/45 line-clamp-2">{svc.desc}</p>
                         <div className="mt-2 inline-flex items-center rounded-full border border-[#ffb38a]/20 bg-[#ffb38a]/10 px-2.5 py-0.5 text-[11px] font-medium text-[#ffd7c7]">
-                          {svc.price} USDC / req
+                          {(svc.price ? formatNativeUsdc(BigInt(svc.price)) : globalPriceLabel)} USDC / req
                         </div>
                       </div>
                       {isSelected && (
@@ -652,7 +692,7 @@ export default function PaywallPage() {
 
             <div className="p-7 md:p-8">
               <p className="max-w-xl text-sm leading-7 text-white/60">
-                Register your API or AI agent here. Your backend endpoint stays private — clients discover your service in the marketplace above and pay per request, settled on-chain.
+                Register your API or AI-powered service here. Ownership, pricing, activation state, and earnings live onchain. Your service name and description are public, but the real backend endpoint stays private behind the ArcFlow proxy.
               </p>
 
               {!svcResult || !svcResultVisible ? (
@@ -674,16 +714,22 @@ export default function PaywallPage() {
                     />
                     <p className="mt-2 text-xs text-white/35">Private — only ArcFlow sees this. Clients receive a proxy URL instead.</p>
                   </div>
-                  <div>
-                    <Label>Price per request (USDC)</Label>
-                    <Input
-                      type="number"
-                      placeholder="0.001"
-                      step="0.0001"
-                      value={svcPrice}
-                      onChange={(e) => setSvcPrice(e.target.value)}
-                    />
-                  </div>
+                  {IS_PAYWALL_V2 ? (
+                    <div>
+                      <Label>Price per request (USDC)</Label>
+                      <Input
+                        type="number"
+                        placeholder="0.001"
+                        step="0.0001"
+                        value={svcPrice}
+                        onChange={(e) => setSvcPrice(e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3.5 text-sm text-white/70">
+                      Global price per request: <span className="font-semibold text-white">{globalPriceLabel} USDC</span>
+                    </div>
+                  )}
                   <div>
                     <Label>Description (optional)</Label>
                     <Input
@@ -706,7 +752,7 @@ export default function PaywallPage() {
                 <div className="mt-6 max-w-xl space-y-4">
                   <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-5 text-sm text-[#ffd7c7] space-y-3">
                     <p className="font-semibold text-white">Your service is live in the marketplace.</p>
-                    <p className="text-white/60">Clients can now discover and select it above. Every request is metered and settled on-chain — your backend endpoint stays private.</p>
+                    <p className="text-white/60">Clients can now discover and select it above. Every request is metered using the service&apos;s onchain price and settled on-chain — your backend endpoint stays private.</p>
                     <div className="space-y-2">
                       <p className="text-xs uppercase tracking-[0.2em] text-white/40">Service ID</p>
                       <code className="block rounded-xl bg-black/30 px-4 py-2.5 text-sm text-white font-mono">{svcResult.serviceId}</code>
@@ -736,6 +782,57 @@ export default function PaywallPage() {
             </div>
           </GlassCard>
         </Reveal>
+
+        {providerOwnsServices && (
+          <Reveal>
+            <GlassCard className="mt-6 overflow-hidden">
+              <div className="border-b border-white/10 p-7 md:p-8">
+                <p className="text-sm uppercase tracking-[0.24em] text-white/50">Provider earnings</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">Claim settled revenue</h2>
+              </div>
+              <div className="p-7 md:p-8 space-y-5">
+                <p className="text-sm leading-7 text-white/60">
+                  This panel only appears for wallets that own at least one onchain service.
+                </p>
+                <div className="rounded-[1.6rem] border border-white/10 bg-black/20 p-5">
+                  <div className="text-xs uppercase tracking-[0.22em] text-white/45">Claimable earnings</div>
+                  <div className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">
+                    {claimable !== undefined ? `${formatNativeUsdc(claimable)} USDC` : "—"}
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    const hash = await writeProviderAction({
+                      address: CONTRACTS.arcPaywall,
+                      abi: PAYWALL_V2_ABI,
+                      functionName: "withdrawProviderEarnings",
+                    });
+                    setClaimHash(hash);
+                  }}
+                  disabled={isProviderActionPending || isClaimMining || !claimable || claimable === 0n}
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-[#fff4ec] px-6 py-4 text-sm font-semibold text-[#291c28] transition disabled:opacity-40"
+                >
+                  {isProviderActionPending || isClaimMining ? "Claiming..." : "Claim earnings"}
+                  <ArrowUpRight className="h-4 w-4" />
+                </button>
+                {showClaimSuccess && claimHash && (
+                  <div className="rounded-2xl border border-[#ffb38a]/20 bg-[#ffb38a]/10 p-4 text-sm text-[#ffd7c7] space-y-2">
+                    <p>Provider withdrawal confirmed.</p>
+                    <a
+                      href={`https://testnet.arcscan.app/tx/${claimHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 font-medium text-[#ffb38a] underline underline-offset-2"
+                    >
+                      View transaction
+                      <ArrowUpRight className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                )}
+              </div>
+            </GlassCard>
+          </Reveal>
+        )}
       </main>
     </div>
   );

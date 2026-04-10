@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       : await upstreamResponse.text()
 
     const normalized = normalizeUpstreamPayload(upstreamPayload)
-    const { availableCredits, onChainRemaining, pendingQueued } = await getCreditsSnapshot(clientAddress)
+    const { availableCredits, onChainRemaining, pendingQueued } = await getCreditsSnapshot(clientAddress, service.serviceId)
 
     const result = {
       success: true,

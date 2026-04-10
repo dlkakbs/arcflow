@@ -2,10 +2,10 @@ import {
   getQueueItems,
   removeSettled,
   syncPendingCounter,
-  PAYWALL_ADDRESS,
   ARC_CHAIN_ID,
 } from './nonceReserver'
 import { keccak256, encodePacked } from 'viem'
+import { IS_PAYWALL_V2, PAYWALL_ADDRESS } from './arcChain'
 
 export const BATCH_SIZE = 50
 export const BATCH_INTERVAL_MS = 10 * 60 * 1000 // 10 dakika
@@ -18,11 +18,29 @@ export interface BatchResult {
 
 // İmza doğrulama (contract'taki hash ile aynı)
 export function buildMsgHash(
+  serviceId: string | undefined,
   clientAddress: string,
   nonce: number,
   deadline: number,
   pricePerRequest: bigint
 ): `0x${string}` {
+  if (IS_PAYWALL_V2 && serviceId) {
+    return keccak256(
+      encodePacked(
+        ['address', 'uint256', 'bytes32', 'address', 'uint256', 'uint256', 'uint256'],
+        [
+          PAYWALL_ADDRESS,
+          BigInt(ARC_CHAIN_ID),
+          serviceId as `0x${string}`,
+          clientAddress as `0x${string}`,
+          BigInt(nonce),
+          BigInt(deadline),
+          pricePerRequest,
+        ]
+      )
+    )
+  }
+
   return keccak256(
     encodePacked(
       ['address', 'uint256', 'address', 'uint256', 'uint256', 'uint256'],
@@ -44,6 +62,7 @@ export async function settleBatch(
   onChainNonce: number,
   pricePerRequest: bigint,
   writeContract: (args: {
+    serviceIds?: string[]
     clients: string[]
     nonces: bigint[]
     deadlines: bigint[]
@@ -79,6 +98,7 @@ export async function settleBatch(
   if (valid.length === 0) return { nonces: [], skipped }
 
   const txHash = await writeContract({
+    serviceIds: IS_PAYWALL_V2 ? valid.map((i) => i.serviceId ?? '0x0000000000000000000000000000000000000000000000000000000000000000') : undefined,
     clients: valid.map(() => clientAddress),
     nonces: valid.map(i => BigInt(i.nonce)),
     deadlines: valid.map(i => BigInt(i.deadline)),

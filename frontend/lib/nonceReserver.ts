@@ -2,7 +2,6 @@ import { Redis } from '@upstash/redis'
 
 // Arc Testnet — native USDC uses 18 decimals
 export const ARC_CHAIN_ID = 5042002
-export const PAYWALL_ADDRESS = '0xb1f95F4d86C743cbe1797C931A9680dF5766633A' as `0x${string}`
 export const RESERVATION_TTL = 300 // 5 dakika
 
 export type SlotState = 'reserved' | 'submitted' | 'settled' | 'expired'
@@ -10,32 +9,150 @@ export type SlotState = 'reserved' | 'submitted' | 'settled' | 'expired'
 export interface Reservation {
   addr: string
   nonce: number
+  serviceId?: string
   state: SlotState
   createdAt: number
   usedAt: number | null
 }
 
-let _redis: Redis | null = null
+type ZItem = { score: number; member: string }
 
-export function getRedis(): Redis {
+interface RedisLike {
+  incr(key: string): Promise<number>
+  set(key: string, value: string, opts?: { ex?: number; xx?: boolean; keepTtl?: boolean }): Promise<unknown>
+  setex(key: string, seconds: number, value: string): Promise<unknown>
+  get<T = string>(key: string): Promise<T | null>
+  del(key: string): Promise<number>
+  zadd(key: string, item: ZItem): Promise<number>
+  zcard(key: string): Promise<number>
+  sadd(key: string, member: string): Promise<number>
+  smembers(key: string): Promise<string[]>
+  srem(key: string, member: string): Promise<number>
+  zrange(key: string, min: number, max: number | '+inf', opts?: { byScore?: boolean }): Promise<string[]>
+  zremrangebyscore(key: string, min: number, max: number): Promise<number>
+}
+
+class LocalRedis implements RedisLike {
+  private values = new Map<string, string>()
+  private expiries = new Map<string, number>()
+  private sets = new Map<string, Set<string>>()
+  private zsets = new Map<string, ZItem[]>()
+
+  private purge(key: string) {
+    const expiry = this.expiries.get(key)
+    if (expiry && Date.now() > expiry) {
+      this.values.delete(key)
+      this.expiries.delete(key)
+    }
+  }
+
+  async incr(key: string) {
+    this.purge(key)
+    const current = Number(this.values.get(key) ?? '0') + 1
+    this.values.set(key, String(current))
+    return current
+  }
+
+  async set(key: string, value: string, opts?: { ex?: number; xx?: boolean; keepTtl?: boolean }) {
+    this.purge(key)
+    if (opts?.xx && !this.values.has(key)) return null
+    this.values.set(key, value)
+    if (opts?.ex) this.expiries.set(key, Date.now() + opts.ex * 1000)
+    if (!opts?.keepTtl && !opts?.ex) this.expiries.delete(key)
+    return 'OK'
+  }
+
+  async setex(key: string, seconds: number, value: string) {
+    this.values.set(key, value)
+    this.expiries.set(key, Date.now() + seconds * 1000)
+    return 'OK'
+  }
+
+  async get<T = string>(key: string) {
+    this.purge(key)
+    return (this.values.get(key) as T | undefined) ?? null
+  }
+
+  async del(key: string) {
+    const existed = this.values.delete(key)
+    this.expiries.delete(key)
+    this.sets.delete(key)
+    this.zsets.delete(key)
+    return existed ? 1 : 0
+  }
+
+  async zadd(key: string, item: ZItem) {
+    const items = this.zsets.get(key) ?? []
+    items.push(item)
+    items.sort((a, b) => a.score - b.score)
+    this.zsets.set(key, items)
+    return 1
+  }
+
+  async zcard(key: string) {
+    return (this.zsets.get(key) ?? []).length
+  }
+
+  async sadd(key: string, member: string) {
+    const set = this.sets.get(key) ?? new Set<string>()
+    const before = set.size
+    set.add(member)
+    this.sets.set(key, set)
+    return set.size > before ? 1 : 0
+  }
+
+  async smembers(key: string) {
+    return [...(this.sets.get(key) ?? new Set<string>())]
+  }
+
+  async srem(key: string, member: string) {
+    const set = this.sets.get(key)
+    if (!set) return 0
+    const existed = set.delete(member)
+    return existed ? 1 : 0
+  }
+
+  async zrange(key: string, min: number, max: number | '+inf', opts?: { byScore?: boolean }) {
+    const items = this.zsets.get(key) ?? []
+    if (opts?.byScore) {
+      const maxScore = max === '+inf' ? Number.POSITIVE_INFINITY : max
+      return items.filter((item) => item.score >= min && item.score <= maxScore).map((item) => item.member)
+    }
+    return items.slice(min, max === '+inf' ? undefined : max + 1).map((item) => item.member)
+  }
+
+  async zremrangebyscore(key: string, min: number, max: number) {
+    const items = this.zsets.get(key) ?? []
+    const filtered = items.filter((item) => item.score < min || item.score > max)
+    this.zsets.set(key, filtered)
+    return items.length - filtered.length
+  }
+}
+
+let _redis: (RedisLike | Redis) | null = null
+
+export function getRedis(): RedisLike | Redis {
   if (!_redis) {
-    _redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL!,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-    })
+    const url = process.env.UPSTASH_REDIS_REST_URL
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN
+
+    _redis = url && token
+      ? (new Redis({ url, token }) as unknown as RedisLike)
+      : new LocalRedis()
   }
   return _redis
 }
 
 // Test'te inject için
-export function setRedisClient(client: Redis) {
+export function setRedisClient(client: RedisLike | Redis) {
   _redis = client
 }
 
 // Atomic nonce rezervasyonu
 export async function reserveNonce(
   clientAddress: string,
-  readContract: (addr: string) => Promise<number>
+  readContract: (addr: string) => Promise<number>,
+  serviceId?: string
 ): Promise<{ nonce: number; reservationId: string }> {
   const redis = getRedis()
   const addr = clientAddress.toLowerCase()
@@ -43,12 +160,13 @@ export async function reserveNonce(
   const pendingOffset = await redis.incr(`pending:${addr}`)
   const onChainNonce = await readContract(addr)
 
-  const nonce = onChainNonce + (pendingOffset as number) - 1
+  const nonce = onChainNonce + pendingOffset - 1
   const reservationId = crypto.randomUUID()
 
   const reservation: Reservation = {
     addr,
     nonce,
+    serviceId,
     state: 'reserved',
     createdAt: Date.now(),
     usedAt: null,
@@ -59,7 +177,6 @@ export async function reserveNonce(
   return { nonce, reservationId }
 }
 
-// Reservation'ı "submitted" olarak işaretle
 export async function markSubmitted(reservationId: string): Promise<Reservation | null> {
   const redis = getRedis()
   const key = `reservation:${reservationId}`
@@ -71,67 +188,57 @@ export async function markSubmitted(reservationId: string): Promise<Reservation 
   if (reservation.state !== 'reserved') return null
 
   const updated: Reservation = { ...reservation, state: 'submitted', usedAt: Date.now() }
-
-  // XX: sadece key varsa yaz, keepttl: TTL'yi koru
   const ok = await redis.set(key, JSON.stringify(updated), { xx: true, keepTtl: true })
   if (!ok) return null
 
   return updated
 }
 
-// Queue'ya ekle (score = nonce, sıralı) + active clients set'e kaydet
 export async function enqueueItem(
   clientAddress: string,
   nonce: number,
   deadline: number,
-  signature: string
+  signature: string,
+  serviceId?: string
 ): Promise<void> {
   const redis = getRedis()
   const addr = clientAddress.toLowerCase()
-  await redis.zadd(`queue:${addr}`, { score: nonce, member: JSON.stringify({ nonce, deadline, signature }) })
+  await redis.zadd(`queue:${addr}`, { score: nonce, member: JSON.stringify({ nonce, deadline, signature, serviceId }) })
   await redis.sadd('active-clients', addr)
 }
 
 export async function getQueueSize(clientAddress: string): Promise<number> {
   const redis = getRedis()
-  const size = await redis.zcard(`queue:${clientAddress.toLowerCase()}`)
-  return Number(size)
+  return Number(await redis.zcard(`queue:${clientAddress.toLowerCase()}`))
 }
 
-// Settle edilecek tüm aktif client'ları getir
 export async function getActiveClients(): Promise<string[]> {
   const redis = getRedis()
-  return (await redis.smembers('active-clients')) as string[]
+  return await redis.smembers('active-clients')
 }
 
-// Client'ı active listesinden çıkar (queue boşaldığında)
 export async function removeActiveClient(clientAddress: string): Promise<void> {
   const redis = getRedis()
   await redis.srem('active-clients', clientAddress.toLowerCase())
 }
 
-// Nonce sırasına göre queue item'larını getir
 export async function getQueueItems(
   clientAddress: string,
   minNonce = 0,
   maxNonce = Infinity
-): Promise<Array<{ nonce: number; deadline: number; signature: string }>> {
+): Promise<Array<{ nonce: number; deadline: number; signature: string; serviceId?: string }>> {
   const redis = getRedis()
   const addr = clientAddress.toLowerCase()
-
   const max: number | '+inf' = maxNonce === Infinity ? '+inf' : maxNonce
   const raw = await redis.zrange(`queue:${addr}`, minNonce, max, { byScore: true })
-
-  return (raw as string[]).map(item => (typeof item === 'string' ? JSON.parse(item) : item))
+  return raw.map((item) => (typeof item === 'string' ? JSON.parse(item) : item))
 }
 
-// Settle edilen item'ları sil
 export async function removeSettled(clientAddress: string, upToNonce: number): Promise<void> {
   const redis = getRedis()
   await redis.zremrangebyscore(`queue:${clientAddress.toLowerCase()}`, 0, upToNonce)
 }
 
-// pending counter'ı sıfırla (settle sonrası)
 export async function syncPendingCounter(clientAddress: string): Promise<void> {
   const redis = getRedis()
   const addr = clientAddress.toLowerCase()
@@ -143,5 +250,5 @@ export async function syncPendingCounter(clientAddress: string): Promise<void> {
     return
   }
 
-  await redis.set(`pending:${addr}`, size)
+  await redis.set(`pending:${addr}`, String(size))
 }

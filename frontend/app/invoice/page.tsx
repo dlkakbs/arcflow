@@ -108,7 +108,7 @@ export default function InvoicePage() {
 
   const { isLoading: isCreateMining, isSuccess: isCreateSuccess, data: createReceipt } =
     useWaitForTransactionReceipt({ hash: createHash });
-  const { isLoading: isPayMining, isSuccess: isPaySuccess, data: payReceipt } =
+  const { isLoading: isPayMining, isSuccess: isPaySuccess } =
     useWaitForTransactionReceipt({ hash: payHash });
 
   const [amount, setAmount] = useState("");

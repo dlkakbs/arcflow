@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { enqueueItem } from '@/lib/nonceReserver'
 import { settleBatch, BATCH_SIZE } from '@/lib/batchSettler'
-import { publicClient, PAYWALL_ADDRESS, PAYWALL_ABI, arcTestnet } from '@/lib/arcChain'
+import { IS_PAYWALL_V2, PAYWALL_ADDRESS, PAYWALL_V1_ABI, PAYWALL_V2_ABI, arcTestnet } from '@/lib/arcChain'
 import { getArcDocsAnswer } from '@/lib/arcDocs'
 import { createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
@@ -79,20 +79,21 @@ export async function POST(req: NextRequest) {
     reservationId,
     signature,
     clientAddress,
+    serviceId,
   })
 
   // ── Queue'ya ekle ─────────────────────────────────────────────────────
-  await enqueueItem(clientAddress, reservation.nonce, deadline, signature)
+  await enqueueItem(clientAddress, reservation.nonce, deadline, signature, reservation.serviceId)
 
   // ── Batch threshold kontrolü → settle ─────────────────────────────────
-  const { pendingQueued } = await getCreditsSnapshot(clientAddress)
+  const { pendingQueued } = await getCreditsSnapshot(clientAddress, reservation.serviceId)
   const queueSize = pendingQueued
   if (queueSize >= BATCH_SIZE && process.env.OWNER_PRIVATE_KEY) {
     triggerBatchSettle(clientAddress, pricePerRequest).catch(console.error)
   }
 
   // ── Response ──────────────────────────────────────────────────────────
-  const { onChainRemaining, pendingQueued: pendingAfterEnqueue, availableCredits } = await getCreditsSnapshot(clientAddress)
+  const { onChainRemaining, pendingQueued: pendingAfterEnqueue, availableCredits } = await getCreditsSnapshot(clientAddress, reservation.serviceId)
 
   const docsAnswer = getArcDocsAnswer(prompt ?? '')
 
@@ -138,12 +139,14 @@ async function triggerBatchSettle(clientAddress: string, pricePerRequest: bigint
     clientAddress,
     onChainNonce,
     pricePerRequest,
-    async ({ clients, nonces, deadlines, signatures }) => {
+    async ({ serviceIds, clients, nonces, deadlines, signatures }) => {
       const hash = await walletClient.writeContract({
         address: PAYWALL_ADDRESS,
-        abi: PAYWALL_ABI,
+        abi: IS_PAYWALL_V2 ? PAYWALL_V2_ABI : PAYWALL_V1_ABI,
         functionName: 'redeemBatch',
-        args: [clients as `0x${string}`[], nonces, deadlines, signatures as `0x${string}`[]],
+        args: IS_PAYWALL_V2
+          ? [serviceIds as `0x${string}`[], clients as `0x${string}`[], nonces, deadlines, signatures as `0x${string}`[]]
+          : [clients as `0x${string}`[], nonces, deadlines, signatures as `0x${string}`[]],
       })
       return hash
     },

@@ -1,30 +1,54 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { publicClient, PAYWALL_ADDRESS, PAYWALL_ABI } from '@/lib/arcChain'
+import {
+  IS_PAYWALL_V2,
+  PAYWALL_ADDRESS,
+  PAYWALL_V1_ABI,
+  PAYWALL_V2_ABI,
+  publicClient,
+} from '@/lib/arcChain'
 import { reserveNonce } from '@/lib/nonceReserver'
 import { getOnChainNonce, getSignatureDeadline } from '@/lib/paywallPayment'
 
 export async function POST(req: NextRequest) {
   try {
-    const { clientAddress } = await req.json()
+    const { clientAddress, serviceId } = await req.json()
 
     if (!clientAddress || !/^0x[0-9a-fA-F]{40}$/.test(clientAddress)) {
       return NextResponse.json({ error: 'Invalid address' }, { status: 400 })
     }
 
-    // On-chain'den pricePerRequest oku
-    const pricePerRequest = await publicClient.readContract({
-      address: PAYWALL_ADDRESS,
-      abi: PAYWALL_ABI,
-      functionName: 'pricePerRequest',
-    })
+    if (IS_PAYWALL_V2 && (!serviceId || !/^0x[0-9a-fA-F]{64}$/.test(serviceId))) {
+      return NextResponse.json({ error: 'Invalid service id' }, { status: 400 })
+    }
 
-    // Remaining bakiyeyi kontrol et
-    const remaining = await publicClient.readContract({
-      address: PAYWALL_ADDRESS,
-      abi: PAYWALL_ABI,
-      functionName: 'requestsRemaining',
-      args: [clientAddress as `0x${string}`],
-    })
+    const pricePerRequest =
+      IS_PAYWALL_V2 && serviceId
+        ? (await publicClient.readContract({
+            address: PAYWALL_ADDRESS,
+            abi: PAYWALL_V2_ABI,
+            functionName: 'getService',
+            args: [serviceId as `0x${string}`],
+          })).pricePerRequest
+        : await publicClient.readContract({
+            address: PAYWALL_ADDRESS,
+            abi: PAYWALL_V1_ABI,
+            functionName: 'pricePerRequest',
+          })
+
+    const remaining =
+      IS_PAYWALL_V2 && serviceId
+        ? await publicClient.readContract({
+            address: PAYWALL_ADDRESS,
+            abi: PAYWALL_V2_ABI,
+            functionName: 'requestsRemaining',
+            args: [clientAddress as `0x${string}`, serviceId as `0x${string}`],
+          })
+        : await publicClient.readContract({
+            address: PAYWALL_ADDRESS,
+            abi: PAYWALL_V1_ABI,
+            functionName: 'requestsRemaining',
+            args: [clientAddress as `0x${string}`],
+          })
 
     if (remaining === 0n) {
       return NextResponse.json(
@@ -35,7 +59,7 @@ export async function POST(req: NextRequest) {
 
     const readContract = async (addr: string): Promise<number> => getOnChainNonce(addr)
 
-    const { nonce, reservationId } = await reserveNonce(clientAddress, readContract)
+    const { nonce, reservationId } = await reserveNonce(clientAddress, readContract, serviceId)
 
     const deadline = getSignatureDeadline(Date.now())
 

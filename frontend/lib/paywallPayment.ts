@@ -1,6 +1,13 @@
 import { keccak256, encodePacked, recoverMessageAddress } from 'viem'
 import { markSubmitted, getRedis, getQueueSize } from './nonceReserver'
-import { publicClient, PAYWALL_ADDRESS, PAYWALL_ABI, arcTestnet } from './arcChain'
+import {
+  arcTestnet,
+  IS_PAYWALL_V2,
+  PAYWALL_ADDRESS,
+  PAYWALL_V1_ABI,
+  PAYWALL_V2_ABI,
+  publicClient,
+} from './arcChain'
 
 export const SIGNATURE_WINDOW_SECONDS = 24 * 60 * 60
 
@@ -8,6 +15,7 @@ export interface VerifiedPaymentRequest {
   reservation: {
     addr: string
     nonce: number
+    serviceId?: string
     createdAt: number
   }
   pricePerRequest: bigint
@@ -21,7 +29,7 @@ export function getSignatureDeadline(createdAtMs: number): number {
 export async function getOnChainNonce(clientAddress: string): Promise<number> {
   const nextNonce = await publicClient.readContract({
     address: PAYWALL_ADDRESS,
-    abi: PAYWALL_ABI,
+    abi: IS_PAYWALL_V2 ? PAYWALL_V2_ABI : PAYWALL_V1_ABI,
     functionName: 'nextNonce',
     args: [clientAddress as `0x${string}`],
   })
@@ -29,14 +37,21 @@ export async function getOnChainNonce(clientAddress: string): Promise<number> {
   return Number(nextNonce)
 }
 
-export async function getCreditsSnapshot(clientAddress: string) {
+export async function getCreditsSnapshot(clientAddress: string, serviceId?: string) {
   const [remaining, queueSize] = await Promise.all([
-    publicClient.readContract({
-      address: PAYWALL_ADDRESS,
-      abi: PAYWALL_ABI,
-      functionName: 'requestsRemaining',
-      args: [clientAddress as `0x${string}`],
-    }),
+    IS_PAYWALL_V2 && serviceId
+      ? publicClient.readContract({
+          address: PAYWALL_ADDRESS,
+          abi: PAYWALL_V2_ABI,
+          functionName: 'requestsRemaining',
+          args: [clientAddress as `0x${string}`, serviceId as `0x${string}`],
+        })
+      : publicClient.readContract({
+          address: PAYWALL_ADDRESS,
+          abi: PAYWALL_V1_ABI,
+          functionName: 'requestsRemaining',
+          args: [clientAddress as `0x${string}`],
+        }),
     getQueueSize(clientAddress),
   ])
 
@@ -50,10 +65,12 @@ export async function verifyPaidRequest({
   reservationId,
   signature,
   clientAddress,
+  serviceId,
 }: {
   reservationId: string
   signature: string
   clientAddress: string
+  serviceId?: string
 }): Promise<VerifiedPaymentRequest> {
   const reservation = await markSubmitted(reservationId)
   if (!reservation) {
@@ -66,25 +83,50 @@ export async function verifyPaidRequest({
     throw new Error('Signature deadline expired.')
   }
 
-  const pricePerRequest = await publicClient.readContract({
-    address: PAYWALL_ADDRESS,
-    abi: PAYWALL_ABI,
-    functionName: 'pricePerRequest',
-  })
+  const targetServiceId = reservation.serviceId ?? serviceId
+  const pricePerRequest =
+    IS_PAYWALL_V2 && targetServiceId
+      ? (await publicClient.readContract({
+          address: PAYWALL_ADDRESS,
+          abi: PAYWALL_V2_ABI,
+          functionName: 'getService',
+          args: [targetServiceId as `0x${string}`],
+        })).pricePerRequest
+      : await publicClient.readContract({
+          address: PAYWALL_ADDRESS,
+          abi: PAYWALL_V1_ABI,
+          functionName: 'pricePerRequest',
+        })
 
-  const msgHash = keccak256(
-    encodePacked(
-      ['address', 'uint256', 'address', 'uint256', 'uint256', 'uint256'],
-      [
-        PAYWALL_ADDRESS,
-        BigInt(arcTestnet.id),
-        clientAddress as `0x${string}`,
-        BigInt(reservation.nonce),
-        BigInt(deadline),
-        pricePerRequest,
-      ]
-    )
-  )
+  const msgHash =
+    IS_PAYWALL_V2 && targetServiceId
+      ? keccak256(
+          encodePacked(
+            ['address', 'uint256', 'bytes32', 'address', 'uint256', 'uint256', 'uint256'],
+            [
+              PAYWALL_ADDRESS,
+              BigInt(arcTestnet.id),
+              targetServiceId as `0x${string}`,
+              clientAddress as `0x${string}`,
+              BigInt(reservation.nonce),
+              BigInt(deadline),
+              pricePerRequest,
+            ]
+          )
+        )
+      : keccak256(
+          encodePacked(
+            ['address', 'uint256', 'address', 'uint256', 'uint256', 'uint256'],
+            [
+              PAYWALL_ADDRESS,
+              BigInt(arcTestnet.id),
+              clientAddress as `0x${string}`,
+              BigInt(reservation.nonce),
+              BigInt(deadline),
+              pricePerRequest,
+            ]
+          )
+        )
 
   const recovered = await recoverMessageAddress({
     message: { raw: msgHash },
@@ -99,6 +141,7 @@ export async function verifyPaidRequest({
     reservation: {
       addr: reservation.addr,
       nonce: reservation.nonce,
+      serviceId: targetServiceId,
       createdAt: reservation.createdAt,
     },
     pricePerRequest,

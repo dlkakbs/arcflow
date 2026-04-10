@@ -3,7 +3,6 @@ import {
   reserveNonce,
   markSubmitted,
   enqueueItem,
-  getQueueItems,
 } from '../lib/nonceReserver'
 import { settleBatch } from '../lib/batchSettler'
 import {

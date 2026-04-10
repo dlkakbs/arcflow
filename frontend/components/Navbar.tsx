@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { injected } from "wagmi/connectors";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 const NAV = [
   { href: "/stream", label: "Stream" },
@@ -21,8 +21,11 @@ export function Navbar() {
   const { address, isConnected } = useAccount();
   const { connect } = useConnect();
   const { disconnect } = useDisconnect();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   return (
     <nav className="sticky top-0 z-50 px-4 pt-4 md:px-8 lg:px-10">

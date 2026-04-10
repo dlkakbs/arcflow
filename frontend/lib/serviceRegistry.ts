@@ -1,69 +1,101 @@
-import { promises as fs } from 'fs'
-import path from 'path'
 import { randomUUID } from 'crypto'
+import { getRedis } from './nonceReserver'
 
-export interface ServiceRecord {
+export interface PublicServiceRecord {
   serviceId: string
   ownerAddress: string
   name: string
   desc: string
-  price: string
-  endpoint: string
   proxyUrl: string
   createdAt: string
 }
 
-const REGISTRY_PATH = path.join('/tmp', 'arcflow-services.json')
-
-async function ensureRegistryFile() {
-  try {
-    await fs.access(REGISTRY_PATH)
-  } catch {
-    await fs.writeFile(REGISTRY_PATH, '[]', 'utf8')
-  }
+export interface ServiceRecord extends PublicServiceRecord {
+  endpoint: string
 }
 
-async function readRegistry(): Promise<ServiceRecord[]> {
-  await ensureRegistryFile()
-  const raw = await fs.readFile(REGISTRY_PATH, 'utf8')
-  const parsed = JSON.parse(raw)
+const REGISTRY_KEY = 'arcflow:services'
+
+function endpointKey(serviceId: string) {
+  return `arcflow:service-endpoint:${serviceId}`
+}
+
+async function readPublicRegistry(): Promise<PublicServiceRecord[]> {
+  const redis = getRedis()
+  const raw = await redis.get<string>(REGISTRY_KEY)
+  if (!raw) return []
+  const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
   return Array.isArray(parsed) ? parsed : []
 }
 
-async function writeRegistry(services: ServiceRecord[]) {
-  await fs.writeFile(REGISTRY_PATH, JSON.stringify(services, null, 2), 'utf8')
+async function writePublicRegistry(services: PublicServiceRecord[]) {
+  const redis = getRedis()
+  await redis.set(REGISTRY_KEY, JSON.stringify(services))
 }
 
-export async function listServices(): Promise<ServiceRecord[]> {
-  return readRegistry()
+async function readEndpoint(serviceId: string): Promise<string | null> {
+  const redis = getRedis()
+  const raw = await redis.get<string>(endpointKey(serviceId))
+  if (!raw) return null
+  return typeof raw === 'string' ? raw : String(raw)
+}
+
+async function writeEndpoint(serviceId: string, endpoint: string) {
+  const redis = getRedis()
+  await redis.set(endpointKey(serviceId), endpoint)
+}
+
+export async function listServices(): Promise<PublicServiceRecord[]> {
+  return readPublicRegistry()
 }
 
 export async function getService(serviceId: string): Promise<ServiceRecord | null> {
-  const services = await readRegistry()
-  return services.find((service) => service.serviceId === serviceId) ?? null
+  const services = await readPublicRegistry()
+  const service = services.find((item) => item.serviceId === serviceId)
+  if (!service) return null
+
+  const endpoint = await readEndpoint(serviceId)
+  if (!endpoint) return null
+
+  return { ...service, endpoint }
 }
 
 export async function registerService(input: {
+  serviceId?: string
   ownerAddress: string
   name: string
   desc?: string
-  price: string
   endpoint: string
 }): Promise<ServiceRecord> {
-  const services = await readRegistry()
-  const serviceId = `svc_${randomUUID().replace(/-/g, '').slice(0, 12)}`
-  const service: ServiceRecord = {
-    serviceId,
-    ownerAddress: input.ownerAddress,
-    name: input.name,
-    desc: input.desc ?? '',
-    price: input.price,
-    endpoint: input.endpoint,
-    proxyUrl: `/api/proxy?service=${serviceId}`,
-    createdAt: new Date().toISOString(),
-  }
+  const services = await readPublicRegistry()
+  const serviceId = input.serviceId ?? `svc_${randomUUID().replace(/-/g, '').slice(0, 12)}`
+  const existing = services.find((service) => service.serviceId === serviceId)
 
-  services.push(service)
-  await writeRegistry(services)
-  return service
+  const publicRecord: PublicServiceRecord = existing
+    ? {
+        ...existing,
+        ownerAddress: input.ownerAddress,
+        name: input.name,
+        desc: input.desc ?? '',
+      }
+    : {
+        serviceId,
+        ownerAddress: input.ownerAddress,
+        name: input.name,
+        desc: input.desc ?? '',
+        proxyUrl: `/api/proxy?service=${serviceId}`,
+        createdAt: new Date().toISOString(),
+      }
+
+  await writePublicRegistry(
+    existing
+      ? services.map((service) => (service.serviceId === serviceId ? publicRecord : service))
+      : [...services, publicRecord]
+  )
+  await writeEndpoint(serviceId, input.endpoint)
+
+  return {
+    ...publicRecord,
+    endpoint: input.endpoint,
+  }
 }

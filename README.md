@@ -14,7 +14,7 @@ ArcFlow is the payment layer on Arc Testnet. Think Stripe, but on-chain — no i
 |--------|-------------|
 | **Stream** | Per-second salary, subscription, or vesting payments |
 | **Invoice** | Create & pay USDC invoices with shareable IDs |
-| **Paywall** | Marketplace for pay-per-request APIs and AI agents — clients deposit credits, providers publish services, payments settle on-chain |
+| **Paywall** | Onchain marketplace for pay-per-request APIs and AI-powered services — providers own services onchain, set service-specific pricing, and earn claimable revenue in native USDC |
 
 ---
 
@@ -60,9 +60,9 @@ Arc is fully EVM-compatible. ArcFlow's contracts are standard Solidity, built wi
 
 | Contract | Address |
 |----------|---------|
-| ArcStream | [`0xAB78614fED57bB451b70EE194fC4043CADCC39eF`](https://testnet.arcscan.app/address/0xAB78614fED57bB451b70EE194fC4043CADCC39eF) |
+| ArcFlow (Stream) | [`0xAB78614fED57bB451b70EE194fC4043CADCC39eF`](https://testnet.arcscan.app/address/0xAB78614fED57bB451b70EE194fC4043CADCC39eF) |
 | ArcInvoice | [`0x8d533a6DF78ef01F6E4E998588D3Ccb21F668486`](https://testnet.arcscan.app/address/0x8d533a6DF78ef01F6E4E998588D3Ccb21F668486) |
-| ArcPaywall | [`0xb1f95F4d86C743cbe1797C931A9680dF5766633A`](https://testnet.arcscan.app/address/0xb1f95F4d86C743cbe1797C931A9680dF5766633A) |
+| ArcPaywall | [`0xC805Da7670ae48CD14Bf50434f919C2Efe3Ed6BD`](https://testnet.arcscan.app/address/0xC805Da7670ae48CD14Bf50434f919C2Efe3Ed6BD) |
 
 - **Network:** Arc Testnet
 - **Chain ID:** 5042002
@@ -84,20 +84,20 @@ Generate a USDC invoice and share the numeric ID with your client. The client pa
 
 ### Paywall
 
-ArcFlow's Paywall is a two-sided marketplace for pay-per-request APIs and AI agents.
+ArcFlow's Paywall is a two-sided onchain marketplace for pay-per-request APIs and AI-powered services.
 
 **For clients:**
-Deposit USDC credits once. Browse available services in the marketplace, select one, and start sending requests. Each request is signed off-chain (no gas) and queued. Credits are deducted per call — no subscriptions, no API keys, no billing surprises.
+Deposit USDC credits once. Browse available services in the marketplace, select one, and start sending requests. Each request is signed off-chain (no gas) and queued. Credits are deducted per call using that service's onchain price — no subscriptions, no API keys, no billing surprises.
 
 **For service providers:**
-Register your API or AI agent endpoint on the Paywall page. Your backend URL stays private — ArcFlow issues a proxy URL that you share publicly (or list in the marketplace). Clients call the proxy; ArcFlow verifies their on-chain balance, forwards the request to your endpoint, and queues the micropayment. Payments are batched and settled on-chain: up to 50 signatures in a single `redeemBatch` transaction, swept by a cron job.
+Register your API or AI-powered service endpoint on the Paywall page. Service ownership, pricing, activation state, and provider earnings live onchain. Public metadata such as the service name and description are stored in the marketplace registry. Your real backend endpoint stays private — ArcFlow issues a proxy URL that you share publicly. Clients call the proxy; ArcFlow verifies their on-chain balance, forwards the request to your private endpoint, and queues the micropayment. Payments are batched and settled on-chain, then providers withdraw accumulated claimable earnings directly from the contract.
 
 The frontend includes a live demo (Arc AI Assistant) so you can see the signing flow and credits deducted in real time.
 
 **Security model:**
 - **Domain separation:** every signature commits to `address(this)` + `chainId`, preventing replay across contracts or chains
 - **Monotonic nonce:** signatures are strictly ordered per user, preventing replay within the same contract
-- **Deadline:** each signature expires after 10 minutes, eliminating stale pending payments
+- **Deadline:** each signature expires after 24 hours, reducing dropped requests in serverless environments while still bounding replay risk
 - **Max deposit cap:** limits custody exposure per user
 - **Normal withdraw:** users can withdraw their unused deposit at any time, no conditions
 - **Escape path:** if the owner is inactive for 7 days, users can emergency-withdraw their full deposit directly from the contract — even if the frontend is down
@@ -117,7 +117,7 @@ The frontend includes a live demo (Arc AI Assistant) so you can see the signing 
 
 **Backend**
 - Next.js API Routes (serverless)
-- Upstash Redis — atomic nonce reservation, idempotency keys, ordered settlement queue
+- Upstash Redis — atomic nonce reservation, idempotency keys, ordered settlement queue, public marketplace metadata, and private endpoint mapping
 - Vercel Cron — hourly batch settlement sweep
 
 ---
@@ -136,8 +136,20 @@ forge build
 # Test
 forge test
 
-# Deploy to Arc Testnet
+# Deploy stream contract
 forge script script/Deploy.s.sol \
+  --rpc-url https://rpc.testnet.arc.network \
+  --private-key $PRIVATE_KEY \
+  --broadcast
+
+# Deploy invoice contract
+forge script script/DeployInvoice.s.sol \
+  --rpc-url https://rpc.testnet.arc.network \
+  --private-key $PRIVATE_KEY \
+  --broadcast
+
+# Deploy paywall contract
+forge script script/DeployPaywallV2.s.sol \
   --rpc-url https://rpc.testnet.arc.network \
   --private-key $PRIVATE_KEY \
   --broadcast
@@ -158,6 +170,8 @@ UPSTASH_REDIS_REST_URL=https://your-db.upstash.io
 UPSTASH_REDIS_REST_TOKEN=your-token
 OWNER_PRIVATE_KEY=0x...
 CRON_SECRET=your-random-secret
+NEXT_PUBLIC_ARC_PAYWALL_V2_ADDRESS=0x...
+ARC_PAYWALL_V2_ADDRESS=0x...
 ```
 
 ### Tests

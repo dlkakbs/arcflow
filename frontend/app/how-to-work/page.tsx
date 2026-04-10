@@ -77,10 +77,10 @@ const MODULES = [
   {
     href: "/paywall",
     title: "Paywall",
-    subtitle: "A marketplace for pay-per-request APIs and AI agents",
-    what: "ArcFlow's Paywall connects two sides: clients who pay per request and service providers who earn per call. No subscriptions, no API keys, no intermediaries — payments settle on-chain in batches.",
+    subtitle: "An onchain marketplace for pay-per-request APIs and AI-powered services",
+    what: "ArcFlow's Paywall connects two sides: clients who pay per request and service providers who earn per call. Service ownership and pricing live onchain, while payments settle in batches with provider earnings claimable from the contract.",
     useCases: [
-      "AI agent APIs monetized per call",
+      "AI-powered APIs monetized per call",
       "Data feeds billed by actual usage",
       "Any service that shouldn't need a subscription",
     ],
@@ -92,10 +92,10 @@ const MODULES = [
         icon: Code2,
         label: "Service providers",
         steps: [
-          "Register your API or AI agent endpoint",
+          "Register your API or AI-powered service endpoint",
           "Your backend URL stays private — clients get a proxy URL",
-          "Service appears in the marketplace automatically",
-          "Earn USDC per request, settled on-chain in batches",
+          "Public metadata appears in the marketplace automatically",
+          "Earn USDC per request, then claim settled revenue onchain",
         ],
       },
       {

@@ -3,7 +3,7 @@ import { createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { getActiveClients, removeActiveClient } from '@/lib/nonceReserver'
 import { settleBatch } from '@/lib/batchSettler'
-import { publicClient, PAYWALL_ADDRESS, PAYWALL_ABI, arcTestnet } from '@/lib/arcChain'
+import { IS_PAYWALL_V2, PAYWALL_ADDRESS, PAYWALL_V1_ABI, PAYWALL_V2_ABI, arcTestnet } from '@/lib/arcChain'
 import { getOnChainNonce } from '@/lib/paywallPayment'
 
 // Vercel Cron: bu endpoint'i sadece Vercel çağırabilir
@@ -29,22 +29,18 @@ export async function GET(req: NextRequest) {
 
   for (const clientAddress of clients) {
     try {
-      const pricePerRequest = await publicClient.readContract({
-        address: PAYWALL_ADDRESS,
-        abi: PAYWALL_ABI,
-        functionName: 'pricePerRequest',
-      })
-
       const result = await settleBatch(
         clientAddress,
         await getOnChainNonce(clientAddress),
-        pricePerRequest,
-        async ({ clients: c, nonces, deadlines, signatures }) => {
+        0n,
+        async ({ serviceIds, clients: c, nonces, deadlines, signatures }) => {
           const hash = await walletClient.writeContract({
             address: PAYWALL_ADDRESS,
-            abi: PAYWALL_ABI,
+            abi: IS_PAYWALL_V2 ? PAYWALL_V2_ABI : PAYWALL_V1_ABI,
             functionName: 'redeemBatch',
-            args: [c as `0x${string}`[], nonces, deadlines, signatures as `0x${string}`[]],
+            args: IS_PAYWALL_V2
+              ? [serviceIds as `0x${string}`[], c as `0x${string}`[], nonces, deadlines, signatures as `0x${string}`[]]
+              : [c as `0x${string}`[], nonces, deadlines, signatures as `0x${string}`[]],
           })
           return hash
         },
